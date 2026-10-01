@@ -1,0 +1,127 @@
+* { box-sizing: border-box; }
+
+html, body, #root {
+  margin: 0;
+  height: 100%;
+}
+
+/* Desktop: grey backdrop with the phone centred */
+body {
+  background: #e3e6eb;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* The phone. `transform` makes Blade's fixed BottomNav stick to the
+   bottom of this frame instead of the browser window. */
+.phone {
+  position: relative;
+  width: 390px;
+  height: 844px;
+  background: #f7f8fa;
+  border-radius: 44px;
+  border: 10px solid #111;
+  overflow: hidden;
+  transform: translateZ(0);
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+}
+
+/* On a real phone, drop the frame and fill the screen */
+@media (max-width: 500px) {
+  body { display: block; background: #f7f8fa; }
+  .phone {
+    width: 100%;
+    height: 100dvh;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .status-bar { display: none !important; }
+}
+
+.status-bar {
+  height: 48px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 28px 0 36px;
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  font-size: 16px;
+  color: #000;
+}
+
+.status-icons { display: flex; gap: 6px; align-items: center; }
+
+/* Scrollable page area, leaving room for the bottom nav */
+.screen {
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: 96px;
+  scrollbar-width: none;
+}
+.screen::-webkit-scrollbar { display: none; }
+
+/* Sub-pages like Memberships use a white background (like the Payments tab) */
+.white-screen {
+  background: #fff;
+  min-height: 100%;
+}
+
+.product-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.product-grid > * { height: 100%; }
+
+/* Make the white background reach the bottom nav on sub-pages */
+.screen:has(.white-screen) { background: #fff; }
+
+/* Blade's default tab underline is black; the Razorpay app uses its blue */
+[data-blade-component="tab-indicator"] { background-color: #1566f1 !important; }
+
+/* Status bar area turns white too on sub-pages */
+.phone:has(.white-screen) { background: #fff; }
+
+/* Three tabs on a narrow phone: remove Blade's fixed gap between tabs
+   and let them share the width, so "Recommendations" isn't squeezed. */
+[role="tablist"] { gap: 0 !important; }
+[role="tab"] {
+  flex: 1 1 auto !important;
+  padding-left: 8px !important;
+  padding-right: 8px !important;
+}
+
+/* "+ New Member" / "+ New Plan" button: centred, 16px above the
+   64px bottom nav, where a thumb naturally rests. `position: fixed`
+   pins it to the phone frame (because .phone has a transform). */
+.thumb-action {
+  position: fixed;
+  left: 50%;
+  bottom: 80px;
+  transform: translateX(-50%);
+  z-index: 101;
+}
+
+/* Colours sampled from the reference "+ New Plan" button */
+.thumb-action button {
+  background-color: #608de9 !important;
+  border: 1px solid #4d7ee6 !important;
+  border-radius: 8px !important;
+  /* Blade adds a corner glow and inner border shadows; the reference is flat */
+  background-image: none !important;
+  box-shadow: 0 6px 16px rgba(77, 126, 230, 0.3) !important;
+  padding-left: 24px !important;
+  padding-right: 24px !important;
+}
+.thumb-action button:hover,
+.thumb-action button:active { background-color: #4d7ee6 !important; }
+
+/* Leave room so the last bit of a list can scroll above the button */
+.screen:has(.thumb-action) { padding-bottom: 160px; }
