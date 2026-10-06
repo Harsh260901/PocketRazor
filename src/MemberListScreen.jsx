@@ -13,13 +13,14 @@ import {
   UsersIcon,
   SearchIcon,
 } from '@razorpay/blade/components';
-import { memberStatus, expiryText, fmtDay, initials, sentAgo } from './membersData.js';
+import { memberStatus, expiryText, endsText, fmtDay, initials, sentAgo, dueThisMonth, endOfMonth, daysBetween, today } from './membersData.js';
 import { frequencyLabel, formatRupees } from './plansData.js';
 
 const LISTS = {
   active: { title: 'Active members', empty: 'No active members yet.' },
   expiring: { title: 'Expiring soon', empty: 'No memberships end in the next 7 days.' },
   expired: { title: 'Expired', empty: 'No memberships ended in the last 30 days.' },
+  due: { title: `Due by ${fmtDay(endOfMonth())}`, empty: 'No more renewals due this month.' },
 };
 
 // Which members belong in each list, and in what order
@@ -30,6 +31,7 @@ export function membersFor(which, members) {
       .filter((m) => ['active', 'expiring', 'pending'].includes(memberStatus(m)))
       .sort((a, b) => a.name.localeCompare(b.name));
   }
+  if (which === 'due') return dueThisMonth(members); // ends between today and month-end
   if (which === 'expiring') {
     return members.filter((m) => memberStatus(m) === 'expiring').sort((a, b) => a.periodEnd - b.periodEnd);
   }
@@ -47,14 +49,22 @@ export function Avatar({ name, size = 32, highlight = false }) {
 function MemberCard({ member, which, onOpen, onSendLink }) {
   const status = memberStatus(member);
   const isPending = status === 'pending';
-  // Expiring/Expired members get "Renew"; members who haven't paid get "Send link".
-  // Both send a Razorpay payment link for their current plan by SMS.
+  // Expiring/Expired/Due members get "Renew"; members who haven't paid get "Send link".
+  // Both ask how they're paying: a Razorpay payment link, or cash recorded by the owner.
   const needsLink = which !== 'active' || isPending;
   const action = !needsLink ? null : member.linkSent ? 'Resend' : which !== 'active' ? 'Renew' : 'Send link';
   let line3;
   if (isPending)
     line3 = <span style={{ color: '#b45309' }}>Starts {fmtDay(member.periodStart)} · Payment pending</span>;
   else if (which === 'expiring') line3 = <span style={{ color: '#b45309' }}>{expiryText(member)}</span>;
+  else if (which === 'due')
+    // Same wording for everyone; orange = ends in the next 7 days
+    line3 =
+      daysBetween(today(), member.periodEnd) <= 7 ? (
+        <span style={{ color: '#b45309' }}>{endsText(member)}</span>
+      ) : (
+        endsText(member)
+      );
   else if (which === 'expired') line3 = <span style={{ color: '#d92d20' }}>{expiryText(member)}</span>;
   else line3 = `Till ${fmtDay(member.periodEnd)}`;
   const sentNote = needsLink && member.linkSent ? (
@@ -73,7 +83,7 @@ function MemberCard({ member, which, onOpen, onSendLink }) {
               </Text>
               <Text size="small" color="surface.text.gray.muted">
                 {member.planName} · {frequencyLabel(member.price)}
-                {isPending && ` · ${formatRupees(member.price.amount)}`}
+                {(isPending || which === 'due') && ` · ${formatRupees(member.price.amount)}`}
               </Text>
               <Text size="small" color="surface.text.gray.muted">
                 {line3}
@@ -99,7 +109,7 @@ function MemberCard({ member, which, onOpen, onSendLink }) {
 /** Full-screen list for Active members, Expiring soon or Expired. */
 // `view` holds the search text and filter ('all' | 'pending'), kept by the
 // parent so they're still there when you come back from a member's details.
-export default function MemberListScreen({ which, members, view = {}, onViewChange, onBack, onOpenMember, onSendLinks }) {
+export default function MemberListScreen({ which, members, view = {}, onViewChange, onBack, onOpenMember, onSendLinks, onRenewOne }) {
   const query = view.query ?? '';
   const filter = view.filter ?? 'all';
   const setQuery = (q) => onViewChange({ ...view, query: q });
@@ -127,6 +137,13 @@ export default function MemberListScreen({ which, members, view = {}, onViewChan
       </Box>
 
       <div className="full-screen-body">
+        {which === 'due' && all.length > 0 && (
+          <Box marginBottom="spacing.4">
+            <Text size="small" color="surface.text.gray.muted">
+              {formatRupees(all.reduce((sum, m) => sum + m.price.amount, 0))} if everyone renews
+            </Text>
+          </Box>
+        )}
         {which === 'active' && all.length > 0 && (
           <Box marginBottom="spacing.4">
             <SearchInput
@@ -162,7 +179,7 @@ export default function MemberListScreen({ which, members, view = {}, onViewChan
               member={m}
               which={which}
               onOpen={() => onOpenMember(m.id)}
-              onSendLink={() => onSendLinks([m])}
+              onSendLink={() => onRenewOne(m)}
             />
           ))}
         </Box>
@@ -177,8 +194,9 @@ export default function MemberListScreen({ which, members, view = {}, onViewChan
         )}
       </div>
 
-      {/* Bulk: send everyone in this list a payment link */}
-      {which !== 'active' && all.length > 0 && (
+      {/* Bulk: send everyone in this list a payment link (not for the month's
+          renewals: those are days or weeks away, and links last 2 days) */}
+      {(which === 'expiring' || which === 'expired') && all.length > 0 && (
         <div className="full-screen-footer rzp-blue-btn">
           <Button size="large" isFullWidth onClick={() => onSendLinks(all)}>
             {`Renew all (${all.length})`}

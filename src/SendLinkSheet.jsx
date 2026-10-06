@@ -31,6 +31,11 @@ async function sendLinks(members) {
         amount: m.price.amount, // same plan and billing option they're on
         description: linkDescription(m),
         purpose: memberStatus(m) === 'pending' ? 'first_payment' : 'renewal',
+        // The plan this payment is for (it can change at renewal)
+        planId: m.planId,
+        planName: m.planName,
+        interval: m.price.interval,
+        unit: m.price.unit,
       })),
     }),
   });
@@ -106,7 +111,7 @@ export default function SendLinkSheet({ members, onClose, onSent }) {
             <Box marginTop="spacing.3">
               <Text size="small" color="surface.text.gray.muted">
                 Razorpay texts {single ? 'them' : 'each member'} a secure link to pay for their current plan. Links stay
-                valid for 7 days.
+                valid for 2 days.
               </Text>
             </Box>
 

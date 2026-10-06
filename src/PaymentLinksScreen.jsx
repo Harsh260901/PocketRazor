@@ -178,7 +178,7 @@ function LinkSheet({ link, onClose, onResend }) {
 /* ---------- The tracker ---------- */
 
 /**
- * Every payment link sent in the last 30 days, with its live status from
+ * Every payment link sent in the last 7 days, with its live status from
  * Razorpay. Refreshes when opened and when ↻ is tapped.
  */
 export default function PaymentLinksScreen({ links, sync, onRefresh, onResend, onBack }) {
@@ -295,7 +295,7 @@ export default function PaymentLinksScreen({ links, sync, onRefresh, onResend, o
           <Box display="flex" flexDirection="column" alignItems="center" gap="spacing.3" paddingY="spacing.8">
             <LinkIcon size="xlarge" color="surface.icon.gray.muted" />
             <Text size="medium" color="surface.text.gray.muted" textAlign="center">
-              No payment links in the last 30 days. Send one from Expiring soon, Expired or a member with payment
+              No payment links in the last 7 days. Send one from Expiring soon, Expired or a member with payment
               pending.
             </Text>
           </Box>
@@ -308,13 +308,6 @@ export default function PaymentLinksScreen({ links, sync, onRefresh, onResend, o
           </Box>
         )}
 
-        {sync.updatedAt && !sync.error && (
-          <Box marginTop="spacing.5">
-            <Text size="small" color="surface.text.gray.muted" textAlign="center">
-              Updated {when(sync.updatedAt)} from Razorpay · checks every minute
-            </Text>
-          </Box>
-        )}
       </div>
 
       {open && <LinkSheet link={open} onClose={() => setOpenId(null)} onResend={onResend} />}

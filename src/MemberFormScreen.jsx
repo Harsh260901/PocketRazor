@@ -79,13 +79,13 @@ export default function MemberFormScreen({ plans, initialMember, prefill, voiceT
         ? null
         : 'Enter a valid 10-digit Indian mobile number',
     email: email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) ? 'Enter a valid email, or leave it empty' : null,
-    plan: plan
+    plan: isEdit || plan
       ? null
       : prefill?.planSaid && !prefill?.planId && !planId
         ? `No plan called "${prefill.planSaid}". Pick one, or create it in Plans first.`
         : 'Pick a plan',
-    option: plan && !selectedPrice ? 'Pick a billing option' : null,
-    startDate: startDate ? null : 'Pick a start date',
+    option: !isEdit && plan && !selectedPrice ? 'Pick a billing option' : null,
+    startDate: isEdit || startDate ? null : 'Pick a start date',
   };
   const hasErrors = Object.values(errors).some(Boolean);
   const show = (key) => (triedSubmit ? errors[key] : null);
@@ -93,6 +93,11 @@ export default function MemberFormScreen({ plans, initialMember, prefill, voiceT
   const handleSave = () => {
     setTriedSubmit(true);
     if (hasErrors) return;
+    // Editing changes contact details only; the plan changes at renewal
+    if (isEdit) {
+      onSave({ name: name.trim(), phone: normalisePhone(phone), email: email.trim().toLowerCase() });
+      return;
+    }
     onSave({
       name: name.trim(),
       phone: normalisePhone(phone),
@@ -104,7 +109,7 @@ export default function MemberFormScreen({ plans, initialMember, prefill, voiceT
     });
   };
 
-  const showPaidBox = !isEdit || !initialMember.paid;
+  const showPaidBox = !isEdit;
 
   return (
     <div className="full-screen">
@@ -168,7 +173,25 @@ export default function MemberFormScreen({ plans, initialMember, prefill, voiceT
             errorText={show('email') ?? undefined}
           />
 
+          {/* Editing: the plan is shown but can't be changed here */}
+          {isEdit && (
+            <Box>
+              <FieldLabel>Plan</FieldLabel>
+              <div className="readonly-field">
+                {initialMember.planName} · {frequencyLabel(initialMember.price)} · {formatRupees(initialMember.price.amount)}
+              </div>
+              <Box marginTop="spacing.2">
+                <Text size="small" color="surface.text.gray.muted">
+                  {initialMember.paid
+                    ? 'To change the plan, use Renew when their membership is due.'
+                    : 'To change the plan, use Collect payment.'}
+                </Text>
+              </Box>
+            </Box>
+          )}
+
           {/* Plan */}
+          {!isEdit && (
           <Box>
             <FieldLabel required>Plan</FieldLabel>
             <Box marginTop="spacing.2">
@@ -204,9 +227,10 @@ export default function MemberFormScreen({ plans, initialMember, prefill, voiceT
               </Box>
             )}
           </Box>
+          )}
 
           {/* Billing option: tap a row */}
-          {plan && (
+          {!isEdit && plan && (
             <Box>
               <FieldLabel required>Billing option</FieldLabel>
               <div className="option-list" role="radiogroup" aria-label="Billing option">
@@ -232,6 +256,7 @@ export default function MemberFormScreen({ plans, initialMember, prefill, voiceT
           )}
 
           {/* Start date */}
+          {!isEdit && (
           <Box>
             <FieldLabel required>Start date</FieldLabel>
             <input
@@ -243,6 +268,7 @@ export default function MemberFormScreen({ plans, initialMember, prefill, voiceT
             />
             <FieldError>{show('startDate')}</FieldError>
           </Box>
+          )}
 
           {showPaidBox && (
             <Checkbox

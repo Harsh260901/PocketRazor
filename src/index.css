@@ -429,3 +429,195 @@ body {
 @keyframes toast-in { from { transform: translateY(-12px); opacity: 0; } to { transform: none; opacity: 1; } }
 @media (max-width: 500px) { .paid-toast { top: 12px; } }
 @media (prefers-reduced-motion: reduce) { .paid-toast { animation: none; } }
+
+/* ---------- Collected this month ---------- */
+.collect-hero { padding: 14px; }
+.collect-split { display: flex; gap: 8px; margin-top: 12px; }
+.collect-split > div {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-radius: 10px;
+  padding: 9px 10px;
+  background: #f5f7fa;
+  font-family: 'Inter', sans-serif;
+}
+.collect-split > div.is-razorpay { background: #eef3fe; }
+.collect-split strong { font-size: 15px; color: #1b2533; }
+.collect-split span { font-size: 12px; color: #5b6b7d; line-height: 1.35; }
+.collect-bar { height: 8px; background: #eef0f3; border-radius: 4px; overflow: hidden; margin: 12px 0 6px; }
+.collect-bar > i { display: block; height: 100%; background: #608de9; border-radius: 4px; }
+.collect-bar.is-thin { height: 6px; margin: 6px 0 0; }
+.plan-share { padding: 6px 0; }
+
+/* "Still to come" rows */
+.due-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 12px 0;
+  border: none;
+  border-bottom: 1px solid #eef0f3;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  font-family: 'Inter', sans-serif;
+}
+.due-row:last-child { border-bottom: none; }
+.due-row > span { display: flex; flex-direction: column; gap: 2px; }
+.due-amount { font-size: 15px; font-weight: 600; color: #1b2533; }
+.due-label { font-size: 13px; color: #5b6b7d; }
+
+/* Payments this month */
+.pay-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 11px 0;
+  border: none;
+  border-bottom: 1px solid #eef0f3;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  font-family: 'Inter', sans-serif;
+}
+.pay-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.pay-name { font-size: 14px; font-weight: 600; color: #1b2533; }
+.pay-sub { font-size: 12.5px; color: #5b6b7d; }
+.pay-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: #f1f3f6;
+  color: #4a5568;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.pay-tag.is-razorpay { background: #eef3fe; color: #1566f1; }
+.pay-amount { display: flex; flex-direction: column; align-items: flex-end; font-size: 14px; font-weight: 600; color: #1b2533; }
+.pay-amount span { font-size: 12.5px; font-weight: 400; color: #5b6b7d; }
+.show-all {
+  display: block;
+  width: 100%;
+  padding: 14px 0 4px;
+  border: none;
+  background: none;
+  color: #1566f1;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* ---------- Link or cash? + Record cash payment ---------- */
+.choice-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px;
+  border: 1px solid #e3e6eb;
+  border-radius: 12px;
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+  font-family: 'Inter', sans-serif;
+}
+.choice-option:active { background: #f5f7fa; }
+.choice-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #eef3fe;
+  color: #1566f1;
+  font-weight: 700;
+  font-size: 17px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.choice-text { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.choice-text strong { font-size: 15px; color: #1b2533; }
+.choice-text span { font-size: 13px; color: #5b6b7d; }
+.readonly-field {
+  margin-top: 8px;
+  padding: 9px 12px;
+  border: 1px solid #e3e6eb;
+  border-radius: 8px;
+  background: #f5f7fa;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  color: #5b6b7d;
+}
+.readonly-field strong { color: #1b2533; }
+.seg-toggle { display: flex; gap: 8px; margin-top: 8px; }
+.seg-toggle button {
+  flex: 1;
+  padding: 9px;
+  border: 1px solid #d5d9e0;
+  border-radius: 8px;
+  background: #fff;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  color: #1b2533;
+  cursor: pointer;
+}
+.seg-toggle button.is-on { border: 2px solid #1566f1; padding: 8px; background: #eef3fe; color: #1566f1; font-weight: 600; }
+.cash-preview {
+  margin-top: 16px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #e7f6ee;
+  color: #0a5c36;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+/* ---------- Renewal panel: plan card with Edit ---------- */
+.renew-plan {
+  position: relative;
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px solid #e3e6eb;
+  border-radius: 12px;
+}
+.renew-plan.is-changed { border-color: #1566f1; background: #f7f9ff; }
+.renew-plan-edit {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: #1566f1;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.renew-plan-edit:active { background: #eef3fe; }
+.renew-plan-amount { margin-top: 2px; font-family: 'Inter', sans-serif; font-size: 20px; font-weight: 700; color: #1b2533; }
+.changed-tag { color: #1566f1; font-weight: 600; }
+.plan-pills { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.plan-pills button {
+  padding: 6px 12px;
+  border: 1px solid #d5d9e0;
+  border-radius: 16px;
+  background: #fff;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  color: #1b2533;
+  cursor: pointer;
+}
+.plan-pills button.is-on { border: 2px solid #1566f1; padding: 5px 11px; background: #eef3fe; color: #1566f1; font-weight: 600; }

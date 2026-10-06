@@ -37,7 +37,7 @@ const AMBER = { icon: 'feedback.icon.notice.intense', text: 'feedback.text.notic
 const RED = { icon: 'feedback.icon.negative.intense', text: 'feedback.text.negative.intense' };
 
 /** The Memberships home page: collections + three member cards. */
-export default function MembersTab({ members, links = [], onOpenList, onOpenLinks }) {
+export default function MembersTab({ members, links = [], onOpenList, onOpenLinks, onOpenCollections }) {
   const statuses = members.map((m) => memberStatus(m));
   const active = members.filter(isActive);
   const expiringCount = statuses.filter((s) => s === 'expiring').length;
@@ -57,11 +57,20 @@ export default function MembersTab({ members, links = [], onOpenList, onOpenLink
   return (
     <Box display="flex" flexDirection="column" gap="spacing.4">
       {/* Money first: what the merchant cares about most */}
-      <Card elevation="none" padding="spacing.4" borderRadius="large">
+      <Card
+        onClick={onOpenCollections}
+        accessibilityLabel="Collected this month"
+        elevation="none"
+        padding="spacing.4"
+        borderRadius="large"
+      >
         <CardBody>
-          <Text size="small" color="surface.text.gray.muted">
-            Collected this month
-          </Text>
+          <Box display="flex" justifyContent="space-between" alignItems="flex-start">
+            <Text size="small" color="surface.text.gray.muted">
+              Collected this month
+            </Text>
+            <ChevronRightIcon size="small" color="surface.icon.gray.muted" />
+          </Box>
           <Box marginTop="spacing.1">
             <Text size="xlarge" weight="semibold" color="surface.text.gray.normal">
               {formatRupees(money.thisMonth)}
@@ -111,7 +120,7 @@ export default function MembersTab({ members, links = [], onOpenList, onOpenLink
         />
       </div>
 
-      {/* Payment links sent in the last 7 days (links stay valid for 7 days) */}
+      {/* Payment links sent in the last 7 days (each link is valid for 2 days) */}
       <StatCard
         icon={LinkIcon}
         label="Payment links · last 7 days"

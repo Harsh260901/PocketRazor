@@ -1,7 +1,7 @@
 // Payment links sent from the app: statuses, the home-card summary, and the
 // calls to our server (which talks to Razorpay with the secret keys).
 
-export const SUMMARY_DAYS = 7; // home card: "last 7 days" (links are valid for 7 days)
+export const SUMMARY_DAYS = 7; // home card and Payment links screen: "last 7 days" (links are valid for 2 days)
 const DAY = 24 * 60 * 60 * 1000;
 export const CHECK_EVERY_MS = 60 * 1000; // automatic "has it been paid?" check: every minute
 

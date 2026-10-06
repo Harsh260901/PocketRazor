@@ -53,7 +53,7 @@ function SectionTitle({ children }) {
 }
 
 /** Full-screen details for one member. */
-export default function MemberDetailsScreen({ member, onBack, onEdit, onRemove, onSendLink }) {
+export default function MemberDetailsScreen({ member, onBack, onEdit, onRemove, onRenew }) {
   const [confirmRemove, setConfirmRemove] = useState(false);
   const status = memberStatus(member);
   const badge = BADGES[status];
@@ -66,6 +66,11 @@ export default function MemberDetailsScreen({ member, onBack, onEdit, onRemove, 
         <Heading size="medium" weight="semibold">
           Member details
         </Heading>
+        {/* Edit contact details and Remove live up here, out of the way */}
+        <Box marginLeft="auto" display="flex" gap="spacing.5" paddingRight="spacing.3">
+          <IconButton icon={EditIcon} size="large" accessibilityLabel="Edit member" onClick={onEdit} />
+          <IconButton icon={TrashIcon} size="large" accessibilityLabel="Remove member" onClick={() => setConfirmRemove(true)} />
+        </Box>
       </Box>
 
       <div className="full-screen-body">
@@ -158,35 +163,14 @@ export default function MemberDetailsScreen({ member, onBack, onEdit, onRemove, 
         )}
       </div>
 
-      <div className="full-screen-footer">
-        {/* Sends a Razorpay payment link by SMS for their current plan */}
-        {(canRenew || status === 'pending') && (
-          <div className="rzp-blue-btn" style={{ marginBottom: 10 }}>
-            <Button size="large" isFullWidth onClick={onSendLink}>
-              {member.linkSent ? 'Resend payment link' : status === 'pending' ? 'Send payment link' : 'Renew membership'}
-            </Button>
-          </div>
-        )}
-        <Box display="flex" gap="spacing.3">
-          <Box flex="1">
-            <Button variant="secondary" icon={EditIcon} iconPosition="left" isFullWidth onClick={onEdit}>
-              Edit
-            </Button>
-          </Box>
-          <Box flex="1">
-            <Button
-              variant="secondary"
-              color="negative"
-              icon={TrashIcon}
-              iconPosition="left"
-              isFullWidth
-              onClick={() => setConfirmRemove(true)}
-            >
-              Remove
-            </Button>
-          </Box>
-        </Box>
-      </div>
+      {/* One button: opens the renewal panel (change plan, then link or cash) */}
+      {(canRenew || status === 'pending') && (
+        <div className="full-screen-footer rzp-blue-btn">
+          <Button size="large" isFullWidth onClick={onRenew}>
+            {status === 'pending' ? 'Collect payment' : 'Renew'}
+          </Button>
+        </div>
+      )}
 
       {/* Are you sure? */}
       {confirmRemove && (

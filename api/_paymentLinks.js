@@ -5,7 +5,7 @@
 // Docs: https://razorpay.com/docs/api/payments/payment-links/create-standard
 
 const MAX_LINKS_PER_REQUEST = 50;
-const LINK_VALID_DAYS = 7;
+const LINK_VALID_DAYS = 2; // a link can be paid for 2 days after it's sent
 
 const isIndianMobile = (d) => /^[6-9]\d{9}$/.test(d);
 const digitsOnly = (s) => String(s ?? '').replace(/\D/g, '').slice(-10);
@@ -27,7 +27,12 @@ async function createLink({ keyId, keySecret, link, smsTo }) {
     notify: { sms: true, email: false },
     reminder_enable: true,
     expire_by: Math.floor(Date.now() / 1000) + LINK_VALID_DAYS * 24 * 60 * 60,
-    notes: { member_id: String(link.memberId).slice(0, 60), purpose: link.purpose },
+    notes: {
+      member_id: String(link.memberId).slice(0, 60),
+      purpose: link.purpose,
+      // Which plan this pays for, so a changed plan applies once it's paid
+      ...(link.plan ? { plan_id: link.plan.id, plan_name: link.plan.name, interval: link.plan.interval, unit: link.plan.unit } : {}),
+    },
   };
 
   let res;
@@ -59,7 +64,7 @@ async function createLink({ keyId, keySecret, link, smsTo }) {
 }
 
 /**
- * Body: { links: [{ memberId, name, phone, email, amount, description, purpose }] }
+ * Body: { links: [{ memberId, name, phone, email, amount, description, purpose, planId, planName, interval, unit }] }
  * Reply: { results: [{ memberId, ok, id, shortUrl, error }], smsTo }
  */
 export async function handleSendPaymentLinks({ method, body, env }) {
@@ -105,6 +110,15 @@ export async function handleSendPaymentLinks({ method, body, env }) {
       amount: Number(item?.amount),
       description: String(item?.description ?? 'Membership payment'),
       purpose: item?.purpose === 'renewal' ? 'renewal' : 'first_payment',
+      plan:
+        item?.planName && ['week', 'month', 'year'].includes(item?.unit) && Number(item?.interval) >= 1
+          ? {
+              id: String(item.planId ?? '').slice(0, 60),
+              name: String(item.planName).slice(0, 100),
+              interval: String(Math.round(Number(item.interval))),
+              unit: item.unit,
+            }
+          : null,
     };
     if (!link.memberId) {
       results.push({ memberId: link.memberId, ok: false, error: 'Missing member.' });
@@ -151,11 +165,11 @@ const keysMissing = (env) =>
       }
     : null;
 
-const TRACK_DAYS = 30;
+const TRACK_DAYS = 7; // the Payment links screen shows the last 7 days
 
 /**
  * GET /api/payment-links
- * Links this app sent in the last 30 days (they carry notes.member_id),
+ * Links this app sent in the last 7 days (they carry notes.member_id),
  * newest first, with their live status from Razorpay.
  */
 export async function handleListPaymentLinks({ method, env }) {
@@ -195,6 +209,9 @@ export async function handleListPaymentLinks({ method, env }) {
         expiresAt: l.expire_by ? Number(l.expire_by) * 1000 : null,
         paidAt: paid ? Number(paid.created_at) * 1000 : null,
         method: paid?.method ?? null,
+        plan: l.notes.plan_name
+          ? { planId: l.notes.plan_id ?? '', planName: l.notes.plan_name, interval: l.notes.interval, unit: l.notes.unit }
+          : null,
       };
     })
     .sort((a, b) => b.sentAt - a.sentAt);

@@ -141,6 +141,96 @@ export function collections(members, now = today()) {
   return { thisMonth, change, lastMonthTotal, dueThisWeek };
 }
 
+export const endOfMonth = (now = today()) => new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+// Paid through a Razorpay payment link (verified by Razorpay), as opposed to
+// cash/UPI the owner recorded themselves
+export const isRazorpayPayment = (p) => /payment link/i.test(p.method);
+
+// Paid-up members whose membership ends between today and the end of the
+// month: the renewals we expect this month (soonest first)
+export const dueThisMonth = (members, now = today()) =>
+  members
+    .filter((m) => m.paid && m.periodEnd >= now && m.periodEnd <= endOfMonth(now))
+    .sort((a, b) => a.periodEnd - b.periodEnd);
+
+// Everything on the "Collected this month" screen
+export function monthReport(members, now = today()) {
+  const base = collections(members, now);
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const payments = [];
+  for (const m of members) {
+    for (const p of m.payments) {
+      const d = startOfDay(p.date);
+      if (d >= monthStart && d <= now) payments.push({ member: m, payment: p });
+    }
+  }
+  payments.sort((a, b) => b.payment.date - a.payment.date || a.member.name.localeCompare(b.member.name));
+
+  const viaRazorpay = payments.filter((x) => isRazorpayPayment(x.payment)).reduce((s, x) => s + x.payment.amount, 0);
+  const plans = {};
+  for (const { member, payment } of payments) {
+    const name = payment.planName ?? member.planName;
+    plans[name] ??= { name, amount: 0, count: 0 };
+    plans[name].amount += payment.amount;
+    plans[name].count += 1;
+  }
+  const due = dueThisMonth(members, now);
+  const pending = members.filter((m) => !m.paid);
+  const sum = (list) => list.reduce((s, m) => s + m.price.amount, 0);
+
+  return {
+    ...base,
+    monthStart,
+    payments,
+    viaRazorpay,
+    recorded: base.thisMonth - viaRazorpay,
+    byPlan: Object.values(plans).sort((a, b) => b.amount - a.amount),
+    expected: { amount: sum(due), count: due.length, by: endOfMonth(now) },
+    pending: { amount: sum(pending), count: pending.length },
+  };
+}
+
+/* ---------- Recording a payment (cash or payment link) ---------- */
+
+// The membership period a payment buys. Pending members start as planned.
+// Everyone else continues from their current end date, or from the day they
+// paid if their membership had already ended by then (no paying for days
+// they missed).
+// `price` is the billing option being paid for (the plan can change at renewal).
+export function periodAfterPayment(m, paidOn, price = m.price) {
+  if (!m.paid) return { start: m.periodStart, end: addPeriod(m.periodStart, price), firstPayment: true };
+  const paid = startOfDay(paidOn);
+  const start = paid > m.periodEnd ? paid : m.periodEnd;
+  return { start, end: addPeriod(start, price), firstPayment: false, restarted: paid > m.periodEnd };
+}
+
+// The member after paying. `plan` ({ planId, planName, price }) switches them
+// to a different plan or billing option from this period on.
+export function applyPayment(m, { date, amount, method }, plan = null) {
+  const next = plan
+    ? {
+        planId: plan.planId,
+        planName: plan.planName,
+        price: { interval: plan.price.interval, unit: plan.price.unit, amount: plan.price.amount },
+      }
+    : { planId: m.planId, planName: m.planName, price: m.price };
+  const { start, end, firstPayment } = periodAfterPayment(m, date, next.price);
+  const payment = { date: startOfDay(date), amount, method, planName: next.planName };
+  const payments = [payment, ...m.payments].sort((a, b) => b.date - a.date);
+  if (firstPayment) return { ...m, ...next, paid: true, periodEnd: end, payments, linkSent: null };
+  return { ...m, ...next, periodStart: start, periodEnd: end, payments, linkSent: null };
+}
+
+// Due list wording: "Ends today" / "Ends tomorrow" / "Ends Thu, 8 Oct" / "Ends 14 Oct"
+export function endsText(m, now = today()) {
+  const left = daysBetween(now, m.periodEnd);
+  if (left === 0) return 'Ends today';
+  if (left === 1) return 'Ends tomorrow';
+  if (left <= EXPIRING_WINDOW_DAYS) return `Ends ${fmtWeekday(m.periodEnd)}`;
+  return `Ends ${fmtDay(m.periodEnd)}`;
+}
+
 /* ---------- Creating members ---------- */
 
 let idCounter = 0;
@@ -192,7 +282,8 @@ export function buildSampleMembers(plans = SAMPLE_PLANS) {
   const gold = byName['Gold gym'];
   const yoga = byName['Yoga classes'];
   const swim = byName['Swimming'];
-  const methods = ['UPI', 'UPI', 'UPI', 'Card', 'Cash'];
+  // Most paid at the desk (recorded by the owner), some through Razorpay payment links
+  const methods = ['UPI', 'Cash', 'UPI', 'UPI · payment link', 'Card · payment link'];
 
   // Fixed cases first so the cards always show 5 expiring and 3 expired
   const fixed = [

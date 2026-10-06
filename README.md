@@ -26,6 +26,8 @@ Run `npm run dev -- --host`, then open the "Network" link it prints on your phon
   - `shareAndCollect` / `onYourWebsite` lists at the top: edit these to change cards.
 - `src/MembershipsScreen.jsx` – the screen that opens when you tap Memberships, with two tabs: Memberships and Plans. Holds the plans and members and decides which screen is showing. Everything resets when the page reloads (there's no database yet).
 - `src/MembersTab.jsx` – the Memberships home page: collected this month, Active members, Expiring soon (next 7 days) and Expired (last 30 days) cards.
+- `src/CollectionsScreen.jsx` – opens when you tap "Collected this month": money in so far (split into Razorpay-verified and cash/UPI recorded by you), what's still to come this month, money by plan, and every payment this month.
+- `src/CashPaymentSheet.jsx` – the "Link or cash?" choice behind every single-member Renew / Send link button, and the Record cash payment panel.
 - `src/MemberListScreen.jsx` – the Active / Expiring soon / Expired lists. Active has search and an All / Payment pending filter, with Send link on pending members; Expiring and Expired have Renew and Renew all buttons. All of these send Razorpay payment links.
 - `src/MemberDetailsScreen.jsx` – one member's details: contact, status, plan, payment history, Edit and Remove, plus Renew membership / Send payment link for members who need to pay, and the last link sent.
 - `src/MemberFormScreen.jsx` – one form for "New member", "Edit member" and members filled in by voice: name, phone, email (optional), plan, billing option, start date, and "Already paid".
@@ -102,9 +104,20 @@ Add the same two as Environment Variables (Production and Preview), then **Deplo
 
 ## Tracking sent links
 
-- **Home card "Payment links · last 7 days"**: how many links you sent and how many got paid in the last 7 days (links stay valid for 7 days), plus how many are still awaiting payment and for how much.
-- **Payment links screen** (tap the card): every link sent in the **last 30 days**, loaded live from Razorpay, so it survives a page reload. Filter by Awaiting / Paid / Expired. Tap ↻ to refresh.
+- **Home card "Payment links · last 7 days"**: how many links you sent and how many got paid in the last 7 days (each link can be paid for 2 days), plus how many are still awaiting payment and for how much.
+- **Payment links screen** (tap the card): every link sent in the **last 7 days** (for members currently in the app), loaded live from Razorpay, so it survives a page reload. Filter by Awaiting / Paid / Expired. Tap ↻ to refresh.
 - **Automatic check:** while any link is awaiting payment, the app asks Razorpay **every minute**, and straight away when you switch back to its tab. If someone has paid, they're renewed and a notice pops up ("Rahul Kumar paid. Membership renewed."); tap it to open the tracker. It pauses while the tab is hidden or nothing is awaiting. The timing is `CHECK_EVERY_MS` in `src/linksData.js`. (This runs in the open app, not as a Vercel cron job: Vercel's free plan only allows cron jobs once a day, and the members live in the browser anyway.)
 - **Tap a link** to see when it was sent, whether it was paid (and how), when it expires, plus Open, Copy and **Resend SMS** (texts the same link again).
 - When a link shows as paid, the member is renewed once: a pending member becomes active, and anyone else gets one more billing period with the payment recorded as "UPI · payment link" (or whichever method they used).
 - Files: `src/PaymentLinksScreen.jsx`, `src/linksData.js`, `api/payment-links.js`, `api/resend-link.js` (both handled in `api/_paymentLinks.js`).
+
+## Collections and cash payments
+
+- **Collected this month** (tap the card): total so far, compared with last month; split into **Via Razorpay · verified** (payment links, confirmed by Razorpay) and **Cash/UPI · recorded by you**; a bar showing progress toward what you should collect this month.
+- **Still to come**: *Expected by month-end* = paid-up members whose membership ends between today and the end of the month, at their current price (an estimate: it assumes everyone renews). Tap it for the **Due by …** list. *Payment pending* opens Active members filtered to Payment pending.
+- **By plan** and **Payments**: every payment this month, newest first, tagged Razorpay or how it was paid. Tap one to open the member.
+- **Renew / Send link on a member's card**, and **Renew / Collect payment** on member details, open the renewal panel: the **plan for the next period** (✎ Edit at its top right to switch plan or billing option) and then **Send payment link** (Razorpay) or **Record cash payment**. Renew all stays payment links only.
+- **Changing a plan only happens here, at renewal.** With a payment link, the member switches to the new plan once they pay (the plan travels with the link in Razorpay's notes). With cash, they switch when you save.
+- **Edit member** (✎ on member details) changes name, phone and email only; the plan is shown but locked. Remove is the 🗑 icon next to it.
+- **Record cash payment** (also on member details): amount is the plan price, pick the date and Cash or UPI to my QR. Renewals continue from the current end date; if the membership had already ended, it restarts on the day they paid. A pending member is simply marked as paid.
+- The app can't see cash or UPI paid to your own QR code, so those only count once you record them.

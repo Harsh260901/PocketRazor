@@ -8,10 +8,18 @@ import MemberListScreen from './MemberListScreen.jsx';
 import MemberDetailsScreen from './MemberDetailsScreen.jsx';
 import MemberFormScreen from './MemberFormScreen.jsx';
 import SendLinkSheet, { linkDescription } from './SendLinkSheet.jsx';
+import CashPaymentSheet, { PayChoiceSheet, currentPlanOf, isPlanChange } from './CashPaymentSheet.jsx';
+import CollectionsScreen from './CollectionsScreen.jsx';
 import PaymentLinksScreen from './PaymentLinksScreen.jsx';
 import { fetchLinks, resendLink, methodLabel, linkStatus, CHECK_EVERY_MS } from './linksData.js';
-import { SAMPLE_PLANS } from './plansData.js';
-import { buildSampleMembers, makeMember, addPeriod, startOfDay, today, memberStatus } from './membersData.js';
+import { SAMPLE_PLANS, formatRupees } from './plansData.js';
+import {
+  buildSampleMembers,
+  makeMember,
+  applyPayment,
+  periodAfterPayment,
+  fmtDay,
+} from './membersData.js';
 
 /* ---------- Voice panel wording for each feature ---------- */
 
@@ -59,8 +67,13 @@ export default function MembershipsScreen() {
   const [sync, setSync] = useState({ loading: false, error: '', updatedAt: null, renewed: [] });
   const renewedLinkIds = useRef(new Set()); // paid links already turned into renewals
   const checking = useRef(false); // a Razorpay check is already running
-  // "Rahul Kumar paid" notice shown when an automatic check renews someone
+  // Pop-up notice, e.g. "Rahul Kumar paid. Membership renewed." from the
+  // automatic check (tap opens the tracker), or "… cash recorded"
   const [paidNotice, setPaidNotice] = useState(null);
+  // Member asked "link or cash?" after tapping Renew, and member recording cash
+  const [choiceFor, setChoiceFor] = useState(null); // member id
+  const [cashFor, setCashFor] = useState(null); // { id, plan }
+  const [linkPlan, setLinkPlan] = useState(null); // plan picked in the renewal panel, for a single link
 
   /* ----- Plans ----- */
   const createPlan = ({ name, description, prices }) => {
@@ -80,36 +93,17 @@ export default function MembershipsScreen() {
     setScreen(null); // back to the Memberships page, where the counts update
   };
 
-  const updateMember = (id, fields) => {
+  // Edit member changes contact details only (the plan changes at renewal)
+  const updateMember = (id, fields) =>
     setMembers((ms) =>
-      ms.map((m) => {
-        if (m.id !== id) return m;
-        const start = startOfDay(fields.startDate);
-        const nowPaid = !m.paid && fields.paid;
-        return {
-          ...m,
-          name: fields.name,
-          phone: fields.phone,
-          email: fields.email,
-          planId: fields.plan.id,
-          planName: fields.plan.name,
-          price: { interval: fields.price.interval, unit: fields.price.unit, amount: fields.price.amount },
-          periodStart: start,
-          periodEnd: addPeriod(start, fields.price),
-          memberSince: start < m.memberSince ? start : m.memberSince,
-          paid: m.paid || fields.paid,
-          payments: nowPaid
-            ? [{ date: today(), amount: fields.price.amount, method: 'Cash or UPI' }, ...m.payments]
-            : m.payments,
-        };
-      }),
+      ms.map((m) => (m.id === id ? { ...m, name: fields.name, phone: fields.phone, email: fields.email } : m)),
     );
-  };
 
   const removeMember = (id) => setMembers((ms) => ms.filter((m) => m.id !== id));
 
   // Remember which members were sent a link, and when; add them to the tracker
-  const markLinksSent = (sent) => {
+  // `sentTo` = the members as sent (with a changed plan, if one was picked)
+  const markLinksSent = (sent, sentTo = members) => {
     const byId = Object.fromEntries(sent.map((r) => [r.memberId, r]));
     setMembers((ms) =>
       ms.map((m) =>
@@ -118,7 +112,7 @@ export default function MembershipsScreen() {
     );
     const now = Date.now();
     const fresh = sent.map((r) => {
-      const m = members.find((x) => x.id === r.memberId);
+      const m = sentTo.find((x) => x.id === r.memberId);
       return {
         id: r.id,
         memberId: r.memberId,
@@ -128,35 +122,49 @@ export default function MembershipsScreen() {
         url: r.shortUrl,
         status: r.status ?? 'created',
         sentAt: now,
-        expiresAt: now + 7 * 24 * 60 * 60 * 1000,
+        expiresAt: now + 2 * 24 * 60 * 60 * 1000, // links are valid for 2 days
         paidAt: null,
         method: null,
+        plan: m ? { planId: m.planId, planName: m.planName, interval: m.price.interval, unit: m.price.unit } : null,
       };
     });
     setLinks((ls) => [...fresh, ...ls.filter((l) => !fresh.some((f) => f.id === l.id))]);
   };
 
   // A paid link renews the member: one more billing period, plus the payment
+  // (If the plan was changed when the link was sent, they switch to it now.)
   const renewFromLink = (m, link) => {
-    const status = memberStatus(m);
-    const payment = {
-      date: startOfDay(link.paidAt ?? Date.now()),
-      amount: link.amount,
-      method: `${methodLabel(link.method)} · payment link`,
-    };
-    if (status === 'pending') {
-      // First payment: the membership they signed up for starts as planned
-      return { ...m, paid: true, payments: [payment, ...m.payments], linkSent: null };
-    }
-    // Still running: extend from the current end date. Already ended: start today.
-    const start = status === 'expired' || status === 'lapsed' ? today() : m.periodEnd;
-    return {
-      ...m,
-      periodStart: start,
-      periodEnd: addPeriod(start, m.price),
-      payments: [payment, ...m.payments],
-      linkSent: null,
-    };
+    const p = link.plan;
+    const plan =
+      p?.planName && p.interval && p.unit
+        ? { planId: p.planId || m.planId, planName: p.planName, price: { interval: Number(p.interval), unit: p.unit, amount: link.amount } }
+        : null;
+    return applyPayment(
+      m,
+      { date: link.paidAt ?? Date.now(), amount: link.amount, method: `${methodLabel(link.method)} · payment link` },
+      plan && isPlanChange(m, plan) ? plan : null,
+    );
+  };
+
+  // Cash or UPI paid straight to the owner, recorded by hand
+  const recordCash = (member, { date, method }, plan = currentPlanOf(member)) => {
+    const { end, firstPayment } = periodAfterPayment(member, date, plan.price);
+    // If they also had a payment link open, don't renew them a second time from it
+    if (member.linkSent?.id) renewedLinkIds.current.add(member.linkSent.id);
+    setMembers((ms) =>
+      ms.map((m) =>
+        m.id === member.id
+          ? applyPayment(m, { date, amount: plan.price.amount, method }, isPlanChange(m, plan) ? plan : null)
+          : m,
+      ),
+    );
+    setCashFor(null);
+    setPaidNotice({
+      text: `${member.name} ${firstPayment ? 'marked as paid' : `renewed till ${fmtDay(end)}`} · ${formatRupees(
+        plan.price.amount,
+      )} ${method === 'Cash' ? 'cash' : 'UPI'} recorded`,
+      at: Date.now(),
+    });
   };
 
   // Ask Razorpay for the latest statuses; renew anyone whose link is now paid.
@@ -190,7 +198,15 @@ export default function MembershipsScreen() {
         renewed: [...s.renewed, ...renewedNames],
       }));
       // Not looking at the tracker? Pop up a notice so the payment isn't missed
-      if (renewedNames.length && screen?.type !== 'links') setPaidNotice({ names: renewedNames, at: Date.now() });
+      if (renewedNames.length && screen?.type !== 'links')
+        setPaidNotice({
+          text:
+            renewedNames.length === 1
+              ? `${renewedNames[0]} paid. Membership renewed.`
+              : `${renewedNames.length} members paid. Memberships renewed.`,
+          openLinks: true,
+          at: Date.now(),
+        });
     } catch (e) {
       if (!background) setSync((s) => ({ ...s, loading: false, error: e.message }));
     } finally {
@@ -201,9 +217,15 @@ export default function MembershipsScreen() {
   // Automatic check: once a minute while any link is still awaiting payment,
   // and straight away when you come back to this tab (e.g. after paying in
   // another tab). Paused while the tab is hidden, to save Razorpay calls.
+  // Only links for members who are in the app right now. Razorpay keeps every
+  // link forever, so links for members you've removed (or test members lost
+  // when the page reloaded) are hidden.
+  const memberIds = new Set(members.map((m) => m.id));
+  const visibleLinks = links.filter((l) => memberIds.has(l.memberId));
+
   const refreshRef = useRef(refreshLinks);
   refreshRef.current = refreshLinks; // always the latest members and links
-  const hasAwaiting = links.some((l) => linkStatus(l) === 'awaiting');
+  const hasAwaiting = visibleLinks.some((l) => linkStatus(l) === 'awaiting');
   useEffect(() => {
     if (!hasAwaiting) return undefined;
     const check = () => {
@@ -224,13 +246,59 @@ export default function MembershipsScreen() {
     return () => clearTimeout(t);
   }, [paidNotice]);
 
-  const sendLinksTo = (list) => setLinkFor(list.map((m) => m.id));
-  const linkSheet = linkFor && (
-    <SendLinkSheet
-      members={members.filter((m) => linkFor.includes(m.id))}
-      onClose={() => setLinkFor(null)}
-      onSent={markLinksSent}
-    />
+  // Payment links for one or many members (bulk buttons, member details)
+  const sendLinksTo = (list) => {
+    setLinkPlan(null);
+    setLinkFor(list.map((m) => m.id));
+  };
+  // Renew / Send link on one member's card: ask "link or cash?" first
+  const renewOne = (m) => setChoiceFor(m.id);
+  const choiceMember = members.find((m) => m.id === choiceFor);
+  const cashMember = members.find((m) => m.id === cashFor?.id);
+  // Members as the link will be sent: with the changed plan, if one was picked
+  const linkMembers = (linkFor ?? []).map((id) => {
+    const m = members.find((x) => x.id === id);
+    return m && linkPlan && isPlanChange(m, linkPlan)
+      ? { ...m, planId: linkPlan.planId, planName: linkPlan.planName, price: linkPlan.price }
+      : m;
+  }).filter(Boolean);
+  const linkSheet = (
+    <>
+      {linkFor && (
+        <SendLinkSheet
+          members={linkMembers}
+          onClose={() => {
+            setLinkFor(null);
+            setLinkPlan(null);
+          }}
+          onSent={(sent) => markLinksSent(sent, linkMembers)}
+        />
+      )}
+      {choiceMember && (
+        <PayChoiceSheet
+          member={choiceMember}
+          plans={plans}
+          onClose={() => setChoiceFor(null)}
+          onLink={(plan) => {
+            setChoiceFor(null);
+            setLinkPlan(plan);
+            setLinkFor([choiceMember.id]);
+          }}
+          onCash={(plan) => {
+            setChoiceFor(null);
+            setCashFor({ id: choiceMember.id, plan });
+          }}
+        />
+      )}
+      {cashMember && (
+        <CashPaymentSheet
+          member={cashMember}
+          plan={cashFor.plan ?? currentPlanOf(cashMember)}
+          onClose={() => setCashFor(null)}
+          onSave={(payment) => recordCash(cashMember, payment, cashFor.plan ?? currentPlanOf(cashMember))}
+        />
+      )}
+    </>
   );
 
   const notice = paidNotice && (
@@ -240,15 +308,11 @@ export default function MembershipsScreen() {
       role="status"
       onClick={() => {
         setPaidNotice(null);
-        setScreen({ type: 'links' });
+        if (paidNotice.openLinks) setScreen({ type: 'links' });
       }}
     >
       <CheckCircleIcon size="medium" color="feedback.icon.positive.intense" />
-      <span>
-        {paidNotice.names.length === 1
-          ? `${paidNotice.names[0]} paid. Membership renewed.`
-          : `${paidNotice.names.length} members paid. Memberships renewed.`}
-      </span>
+      <span>{paidNotice.text}</span>
     </button>
   );
 
@@ -286,10 +350,25 @@ export default function MembershipsScreen() {
     }
 
     /* ----- Member screens ----- */
+    if (screen?.type === 'collections') {
+      return (
+        <>
+          <CollectionsScreen
+            members={members}
+            onBack={() => setScreen(null)}
+            onOpenDue={() => setScreen({ type: 'list', which: 'due', from: screen })}
+            onOpenPending={() => setScreen({ type: 'list', which: 'active', view: { filter: 'pending' }, from: screen })}
+            onOpenMember={(id) => setScreen({ type: 'details', id, from: screen })}
+          />
+          {linkSheet}
+        </>
+      );
+    }
+
     if (screen?.type === 'links') {
       return (
         <PaymentLinksScreen
-          links={links}
+          links={visibleLinks}
           sync={sync}
           onRefresh={refreshLinks}
           onResend={resendLink}
@@ -309,9 +388,10 @@ export default function MembershipsScreen() {
             members={members}
             view={screen.view}
             onViewChange={(view) => setScreen({ ...screen, view })}
-            onBack={() => setScreen(null)}
+            onBack={() => setScreen(screen.from ?? null)}
             onOpenMember={(id) => setScreen({ type: 'details', id, from: screen })}
             onSendLinks={sendLinksTo}
+            onRenewOne={renewOne}
           />
           {linkSheet}
         </>
@@ -331,7 +411,7 @@ export default function MembershipsScreen() {
                 removeMember(member.id);
                 setScreen(screen.from ?? null);
               }}
-              onSendLink={() => sendLinksTo([member])}
+              onRenew={() => renewOne(member)}
             />
             {linkSheet}
           </>
@@ -376,9 +456,10 @@ export default function MembershipsScreen() {
             <TabPanel value="memberships">
               <MembersTab
                 members={members}
-                links={links}
+                links={visibleLinks}
                 onOpenList={(which) => setScreen({ type: 'list', which })}
                 onOpenLinks={() => setScreen({ type: 'links' })}
+              onOpenCollections={() => setScreen({ type: 'collections' })}
               />
             </TabPanel>
             <TabPanel value="plans">
