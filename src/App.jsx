@@ -49,6 +49,7 @@ const shareAndCollect = [
     title: 'Memberships',
     description: 'Collect recurring fees from your members automatically',
     isNew: true,
+    inScope: true, // the only product built in this prototype
   },
 ];
 
@@ -138,6 +139,14 @@ function ProductCard({ product, onClick }) {
             {product.description}
           </Text>
         </Box>
+        {/* Fine print: shown for context only */}
+        {!product.inScope && (
+          <Box marginTop="spacing.3">
+            <Text size="xsmall" color="surface.text.gray.disabled">
+              Not in scope for this prototype
+            </Text>
+          </Box>
+        )}
       </CardBody>
     </Card>
   );
@@ -165,6 +174,12 @@ function ProductsScreen({ onOpen }) {
           <ProductCard key={p.id} product={p} onClick={() => onOpen(p.id)} />
         ))}
       </div>
+
+      <Box marginTop="spacing.6">
+        <Text size="xsmall" color="surface.text.gray.disabled">
+          Only Memberships is built in this prototype. The other products are shown for context and are not in scope.
+        </Text>
+      </Box>
     </Box>
   );
 }

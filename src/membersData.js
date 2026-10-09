@@ -254,6 +254,11 @@ export function makeMember({ name, phone, email, plan, price, startDate, paid, m
 
 /* ---------- Sample members ---------- */
 
+// Every sample member uses this one number, so any payment link sent from
+// the prototype texts the owner of this demo and never a stranger.
+// Members you add yourself keep the number you type in.
+export const DEMO_PHONE = '9652821908';
+
 const NAMES = [
   'Rahul Kumar', 'Priya Sharma', 'Arjun Mehta', 'Sneha Nair', 'Rohan Desai', 'Vikram Rao', 'Anita Joshi',
   'Karan Das', 'Meera Iyer', 'Nikhil Gupta', 'Aisha Khan', 'Siddharth Rao', 'Pooja Patel', 'Aditya Singh',
@@ -326,7 +331,7 @@ export function buildSampleMembers(plans = SAMPLE_PLANS) {
     return {
       id: `s${i}`,
       name: f.name,
-      phone: digits,
+      phone: DEMO_PHONE, // (digits above still drawn so the rest of the sample data stays the same)
       email,
       planId: f.plan.id,
       planName: f.plan.name,
@@ -341,8 +346,8 @@ export function buildSampleMembers(plans = SAMPLE_PLANS) {
 
   // Two members who joined in the last couple of days but haven't paid yet
   const pending = [
-    { id: 'pend1', name: 'Dev Malhotra', phone: '9811122333', plan: gold, startIn: -1 },
-    { id: 'pend2', name: 'Riya Bose', phone: '9830044556', plan: yoga, startIn: -2 },
+    { id: 'pend1', name: 'Dev Malhotra', phone: DEMO_PHONE, plan: gold, startIn: -1 },
+    { id: 'pend2', name: 'Riya Bose', phone: DEMO_PHONE, plan: yoga, startIn: -2 },
   ].map((p) => {
     const price = p.plan.prices[0];
     const start = addDays(now, p.startIn);

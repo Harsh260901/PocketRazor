@@ -1,15 +1,12 @@
-import { useState } from 'react';
 import { Box, Text, Heading, IconButton, ArrowLeftIcon, ChevronRightIcon } from '@razorpay/blade/components';
 import { formatRupees, frequencyLabel } from './plansData.js';
-import { monthReport, isRazorpayPayment, fmtDay } from './membersData.js';
-import { Avatar } from './MemberListScreen.jsx';
+import { monthReport, fmtDay } from './membersData.js';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-const SHOW_FIRST = 8;
 
 function SectionTitle({ children }) {
   return (
-    <Box marginTop="spacing.6" marginBottom="spacing.3">
+    <Box marginTop="spacing.4" marginBottom="spacing.2">
       <Text size="xsmall" weight="semibold" color="surface.text.gray.muted">
         {children}
       </Text>
@@ -30,20 +27,27 @@ function DueRow({ amount, label, onClick }) {
   );
 }
 
+// Lets a whole card act as a button (it holds headings, so it can't be a <button>)
+const tappable = (onClick, label) => ({
+  role: 'button',
+  tabIndex: 0,
+  'aria-label': label,
+  onClick,
+  onKeyDown: (e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), onClick()),
+});
+
 /**
- * What opens when you tap "Collected this month": money in so far (split into
- * Razorpay-verified and recorded by you), what's still to come, money by plan,
- * and every payment this month.
+ * What opens when you tap "Collected this month": a one-screen overview of
+ * money in so far (split into Razorpay-verified and recorded by you), what's
+ * still to come and money by plan. Tap the total or a plan to see payments.
  */
-export default function CollectionsScreen({ members, onBack, onOpenDue, onOpenPending, onOpenMember }) {
-  const [showAll, setShowAll] = useState(false);
+export default function CollectionsScreen({ members, onBack, onOpenDue, onOpenPending, onOpenPayments }) {
   const r = monthReport(members);
   const now = new Date();
   const month = MONTHS[now.getMonth()];
   const range = now.getDate() === 1 ? fmtDay(now) : `1–${fmtDay(now)}`;
   const expectedTotal = r.thisMonth + r.expected.amount + r.pending.amount;
   const progress = expectedTotal ? Math.round((r.thisMonth / expectedTotal) * 100) : 0;
-  const shown = showAll ? r.payments : r.payments.slice(0, SHOW_FIRST);
 
   return (
     <div className="full-screen">
@@ -56,10 +60,13 @@ export default function CollectionsScreen({ members, onBack, onOpenDue, onOpenPe
 
       <div className="full-screen-body">
         {/* Money in so far */}
-        <div className="detail-box collect-hero">
-          <Text size="small" color="surface.text.gray.muted">
-            Collected · {range}
-          </Text>
+        <div className="detail-box collect-hero is-tappable" {...tappable(() => onOpenPayments(null), 'See all payments this month')}>
+          <Box display="flex" justifyContent="space-between" alignItems="center">
+            <Text size="small" color="surface.text.gray.muted">
+              Collected · {range}
+            </Text>
+            <ChevronRightIcon size="medium" color="surface.icon.gray.muted" />
+          </Box>
           <Box marginTop="spacing.1">
             <Heading size="xlarge" weight="semibold">
               {formatRupees(r.thisMonth)}
@@ -126,68 +133,30 @@ export default function CollectionsScreen({ members, onBack, onOpenDue, onOpenPe
           </div>
         )}
 
-        {/* Money by plan */}
+        {/* Money by plan: tap one to see its payments */}
         {r.byPlan.length > 0 && (
           <>
             <SectionTitle>BY PLAN</SectionTitle>
-            <div className="detail-box" style={{ paddingTop: 10, paddingBottom: 12 }}>
+            <div className="detail-box">
               {r.byPlan.map((p) => (
-                <div key={p.name} className="plan-share">
-                  <Box display="flex" justifyContent="space-between">
-                    <Text size="small" weight="semibold" color="surface.text.gray.normal">
-                      {p.name}
-                    </Text>
-                    <Text size="small" weight="semibold" color="surface.text.gray.normal">
-                      {formatRupees(p.amount)}
-                    </Text>
-                  </Box>
-                  <Text size="small" color="surface.text.gray.muted">
-                    {p.count} {p.count === 1 ? 'payment' : 'payments'}
-                  </Text>
-                  <div className="collect-bar is-thin">
-                    <i style={{ width: `${Math.max(2, Math.round((p.amount / r.thisMonth) * 100))}%` }} />
-                  </div>
-                </div>
+                <button key={p.name} className="plan-share-row" onClick={() => onOpenPayments(p.name)} aria-label={`${p.name} payments`}>
+                  <span className="plan-share-main">
+                    <span className="plan-share-top">
+                      <strong>{p.name}</strong>
+                      <strong>{formatRupees(p.amount)}</strong>
+                    </span>
+                    <span className="plan-share-count">
+                      {p.count} {p.count === 1 ? 'payment' : 'payments'}
+                    </span>
+                    <span className="collect-bar is-thin">
+                      <i style={{ width: `${Math.max(2, Math.round((p.amount / r.thisMonth) * 100))}%` }} />
+                    </span>
+                  </span>
+                  <ChevronRightIcon size="medium" color="surface.icon.gray.muted" />
+                </button>
               ))}
             </div>
           </>
-        )}
-
-        {/* Every payment this month */}
-        <SectionTitle>PAYMENTS ({r.payments.length})</SectionTitle>
-        {r.payments.length === 0 && (
-          <Text size="small" color="surface.text.gray.muted">
-            No payments yet this month.
-          </Text>
-        )}
-        {shown.map(({ member, payment }, i) => {
-          const rz = isRazorpayPayment(payment);
-          return (
-            <button
-              key={`${member.id}-${i}`}
-              className="pay-row"
-              onClick={() => onOpenMember(member.id)}
-              aria-label={`${member.name} paid ${formatRupees(payment.amount)}`}
-            >
-              <Avatar name={member.name} size={34} />
-              <span className="pay-main">
-                <span className="pay-name">{member.name}</span>
-                <span className="pay-sub">
-                  {payment.planName ?? member.planName} · {frequencyLabel(member.price)}
-                  <span className={`pay-tag${rz ? ' is-razorpay' : ''}`}>{rz ? 'Razorpay' : payment.method}</span>
-                </span>
-              </span>
-              <span className="pay-amount">
-                {formatRupees(payment.amount)}
-                <span>{fmtDay(payment.date)}</span>
-              </span>
-            </button>
-          );
-        })}
-        {!showAll && r.payments.length > SHOW_FIRST && (
-          <button className="show-all" onClick={() => setShowAll(true)}>
-            Show all {r.payments.length}
-          </button>
         )}
       </div>
     </div>

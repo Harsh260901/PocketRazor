@@ -10,6 +10,7 @@ import MemberFormScreen from './MemberFormScreen.jsx';
 import SendLinkSheet, { linkDescription } from './SendLinkSheet.jsx';
 import CashPaymentSheet, { PayChoiceSheet, currentPlanOf, isPlanChange } from './CashPaymentSheet.jsx';
 import CollectionsScreen from './CollectionsScreen.jsx';
+import PaymentsScreen from './PaymentsScreen.jsx';
 import PaymentLinksScreen from './PaymentLinksScreen.jsx';
 import { fetchLinks, resendLink, methodLabel, linkStatus, CHECK_EVERY_MS } from './linksData.js';
 import { SAMPLE_PLANS, formatRupees } from './plansData.js';
@@ -358,10 +359,22 @@ export default function MembershipsScreen() {
             onBack={() => setScreen(null)}
             onOpenDue={() => setScreen({ type: 'list', which: 'due', from: screen })}
             onOpenPending={() => setScreen({ type: 'list', which: 'active', view: { filter: 'pending' }, from: screen })}
-            onOpenMember={(id) => setScreen({ type: 'details', id, from: screen })}
+            onOpenPayments={(plan) => setScreen({ type: 'payments', view: { plan }, from: screen })}
           />
           {linkSheet}
         </>
+      );
+    }
+
+    if (screen?.type === 'payments') {
+      return (
+        <PaymentsScreen
+          members={members}
+          view={screen.view}
+          onViewChange={(view) => setScreen({ ...screen, view })}
+          onBack={() => setScreen(screen.from ?? null)}
+          onOpenMember={(id) => setScreen({ type: 'details', id, from: screen })}
+        />
       );
     }
 

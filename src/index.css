@@ -431,8 +431,8 @@ body {
 @media (prefers-reduced-motion: reduce) { .paid-toast { animation: none; } }
 
 /* ---------- Collected this month ---------- */
-.collect-hero { padding: 14px; }
-.collect-split { display: flex; gap: 8px; margin-top: 12px; }
+.collect-hero { padding: 12px 14px; }
+.collect-split { display: flex; gap: 8px; margin-top: 10px; }
 .collect-split > div {
   flex: 1;
   display: flex;
@@ -446,7 +446,7 @@ body {
 .collect-split > div.is-razorpay { background: #eef3fe; }
 .collect-split strong { font-size: 15px; color: #1b2533; }
 .collect-split span { font-size: 12px; color: #5b6b7d; line-height: 1.35; }
-.collect-bar { height: 8px; background: #eef0f3; border-radius: 4px; overflow: hidden; margin: 12px 0 6px; }
+.collect-bar { height: 8px; background: #eef0f3; border-radius: 4px; overflow: hidden; margin: 10px 0 5px; }
 .collect-bar > i { display: block; height: 100%; background: #608de9; border-radius: 4px; }
 .collect-bar.is-thin { height: 6px; margin: 6px 0 0; }
 .plan-share { padding: 6px 0; }
@@ -457,7 +457,7 @@ body {
   justify-content: space-between;
   align-items: center;
   width: 100%;
-  padding: 12px 0;
+  padding: 10px 0;
   border: none;
   border-bottom: 1px solid #eef0f3;
   background: none;
@@ -621,3 +621,75 @@ body {
   cursor: pointer;
 }
 .plan-pills button.is-on { border: 2px solid #1566f1; padding: 5px 11px; background: #eef3fe; color: #1566f1; font-weight: 600; }
+
+/* ---------- Collections overview: tappable total and plans ---------- */
+.collect-hero.is-tappable { cursor: pointer; }
+.collect-hero.is-tappable:active { background: #f7f9ff; }
+.collect-hero.is-tappable:focus-visible { outline: 2px solid #1566f1; outline-offset: 2px; }
+.plan-share-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 0;
+  border: none;
+  border-bottom: 1px solid #eef0f3;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  font-family: 'Inter', sans-serif;
+}
+.plan-share-row:last-child { border-bottom: none; }
+.plan-share-main { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.plan-share-top { display: flex; justify-content: space-between; font-size: 14px; color: #1b2533; }
+.plan-share-top strong { font-weight: 600; }
+.plan-share-count { font-size: 12.5px; color: #5b6b7d; }
+.plan-share-main .collect-bar { display: block; margin-top: 6px; }
+
+/* ---------- Payments page ---------- */
+.filter-chips {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  margin-bottom: 8px;
+  scrollbar-width: none;
+}
+.filter-chips::-webkit-scrollbar { display: none; }
+.filter-chips button {
+  flex-shrink: 0;
+  padding: 6px 12px;
+  border: 1px solid #d5d9e0;
+  border-radius: 8px;
+  background: #fff;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  color: #1b2533;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.filter-chips button.is-on { border-color: #1566f1; background: #eef3fe; color: #1566f1; font-weight: 600; }
+.pay-day {
+  margin-top: 12px;
+  font-family: 'Inter', sans-serif;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #5b6b7d;
+}
+.plan-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  padding: 5px 8px 5px 12px;
+  border: 1px solid #1566f1;
+  border-radius: 16px;
+  background: #eef3fe;
+  color: #1566f1;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
