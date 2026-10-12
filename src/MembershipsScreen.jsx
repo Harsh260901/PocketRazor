@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { Box, Tabs, TabList, TabItem, TabPanel, Button, PlusIcon, MicIcon, CheckCircleIcon } from '@razorpay/blade/components';
+import { CheckCircleIcon } from '@razorpay/blade/components';
 import PlansTab from './PlansTab.jsx';
 import PlanFormScreen from './PlanFormScreen.jsx';
 import VoiceSheet from './VoiceSheet.jsx';
 import MembersTab from './MembersTab.jsx';
+import VoiceButton from './VoiceButton.jsx';
+import AnswerSheet, { ResendSheet } from './AnswerSheet.jsx';
+import { classify, answer as answerFor } from './assistant.js';
 import MemberListScreen from './MemberListScreen.jsx';
 import MemberDetailsScreen from './MemberDetailsScreen.jsx';
 import MemberFormScreen from './MemberFormScreen.jsx';
@@ -44,11 +47,32 @@ const MEMBER_VOICE = {
   nothingFoundMessage: "Couldn't find member details in that. Say their name, phone number and plan.",
 };
 
+const ASK_VOICE = {
+  title: 'Ask or do anything',
+  subtitle: 'Ask about members, plans, renewals, links or money',
+  example: "Who's expiring this week?",
+  typeLabel: 'Your question',
+  endpoint: '/api/ask',
+  thinkingText: 'Working it out…',
+  submitLabel: 'Ask',
+};
+
+// Example questions shown in the voice panel, by screen
+const ASK_CHIPS = {
+  home: ["Who's expiring this week?", 'Has Rahul paid?', 'How much this month?', 'Add a member', 'Create a plan'],
+  active: ["Who hasn't paid?", 'Has Rahul paid?', "Who's on Gold gym?", 'Add a member'],
+  plans: ['How many are on Gold gym?', 'What does yoga cost?', 'Create a plan'],
+  collections: ["Who hasn't paid?", 'Who paid this week?', 'How much came by cash?', 'How much from Gold gym?'],
+  expiring: ['Renew everyone expiring today', 'Renew everyone expiring this week', 'Has Rahul paid?'],
+  expired: ['Renew everyone who expired', 'Who expired this week?', 'Has Vikram paid?'],
+  payments: ['Who paid this week?', 'How much came by cash?', 'How much came via Razorpay?', 'How much from Gold gym?'],
+  due: ['How much is still to come?', 'Renew everyone expiring today', 'Who expires this week?'],
+  pending: ["Who hasn't paid?", "Send links to everyone who hasn't paid", 'Has Dev paid?'],
+};
+
 /* ---------- The screen ---------- */
 
 export default function MembershipsScreen() {
-  const [activeTab, setActiveTab] = useState('memberships');
-
   // Plans and members live here so they survive switching tabs and screens.
   // They reset when the page reloads (no database yet).
   const [plans, setPlans] = useState(SAMPLE_PLANS);
@@ -59,8 +83,11 @@ export default function MembershipsScreen() {
   // Member screens, e.g. { type: 'list', which: 'expiring', view: { query, filter } },
   // { type: 'details', id, from }, { type: 'form', id?, voice?, from }
   const [screen, setScreen] = useState(null);
-  // Which voice panel is open: null, 'plan' or 'member'
+  // Which voice panel is open: null, 'plan', 'member' or { ask: true, typing }
   const [voice, setVoice] = useState(null);
+  // The assistant's answer: { asked, intent, result } (null = closed)
+  const [answer, setAnswer] = useState(null);
+  const [resendFor, setResendFor] = useState(null); // links to resend (after confirming)
   // Members about to be sent a Razorpay payment link (null = panel closed)
   const [linkFor, setLinkFor] = useState(null);
   // Payment links sent (from this session, plus whatever Razorpay reports)
@@ -91,7 +118,7 @@ export default function MembershipsScreen() {
   /* ----- Members ----- */
   const addMember = (fields) => {
     setMembers((ms) => [makeMember(fields), ...ms]);
-    setScreen(null); // back to the Memberships page, where the counts update
+    setScreen((sc) => sc?.from ?? null); // back to where they started (home or Active members)
   };
 
   // Edit member changes contact details only (the plan changes at renewal)
@@ -302,6 +329,131 @@ export default function MembershipsScreen() {
     </>
   );
 
+  /* ----- Voice assistant ----- */
+  const data = { members, plans, links: visibleLinks };
+  const context =
+    screen?.type === 'plans' ? 'plans'
+    : screen?.type === 'collections' ? 'collections'
+    : screen?.type === 'payments' ? 'payments'
+    : screen?.type === 'list' && screen.which === 'active' && screen.view?.filter === 'pending' ? 'pending'
+    : screen?.type === 'list' ? screen.which
+    : 'home';
+
+  // What was asked → open a filled form (commands) or show an answer (questions)
+  const handleAsked = (intent, words) => {
+    setVoice(null);
+    if (intent.intent === 'add_member') {
+      setAnswer(null);
+      setScreen(intent.fields ? { type: 'form', voice: { fields: intent.fields, transcript: words }, from: screen } : { type: 'form', from: screen });
+      return;
+    }
+    if (intent.intent === 'create_plan') {
+      setAnswer(null);
+      setPlanForm(intent.fields?.name || intent.fields?.prices?.length ? { voice: { fields: intent.fields, transcript: words } } : 'new');
+      return;
+    }
+    setAnswer({ asked: words, intent, result: answerFor(intent, data) });
+  };
+
+  // Tapping an example: answered straight away from the records (no AI needed)
+  const askChips = ASK_CHIPS[context].map((label) => ({
+    label,
+    onPick: () => {
+      if (label === 'Add a member') return setVoice('member');
+      if (label === 'Create a plan') return setVoice('plan');
+      return handleAsked(classify(label, data), label);
+    },
+  }));
+
+  // Buttons on an answer. Anything that moves money opens the usual confirm screen.
+  const runAction = (act) => {
+    const from = screen;
+    if (act.type === 'reanswer') {
+      setAnswer({ ...answer, intent: act.intent, result: answerFor(act.intent, data) });
+      return;
+    }
+    if (act.type === 'choose') {
+      const intent = { ...answer.intent, memberId: act.id };
+      setAnswer({ ...answer, intent, result: answerFor(intent, data) });
+      return;
+    }
+    setAnswer(null);
+    if (act.type === 'renew') {
+      const list = act.memberIds.map((id) => members.find((m) => m.id === id)).filter(Boolean);
+      if (list.length === 1) renewOne(list[0]); // "link or cash?" then confirm
+      else if (list.length) sendLinksTo(list); // confirm sheet for everyone
+    } else if (act.type === 'resend') setResendFor(visibleLinks.filter((l) => act.linkIds.includes(l.id)));
+    // Already on that screen? Just change its filters instead of stacking another copy
+    else if (act.type === 'list' && from?.type === 'list' && from.which === act.which) setScreen({ ...from, view: act.view ?? {} });
+    else if (act.type === 'payments' && from?.type === 'payments') setScreen({ ...from, view: act.view ?? {} });
+    else if (act.type === 'list') setScreen({ type: 'list', which: act.which, view: act.view ?? {}, from });
+    else if (act.type === 'member') setScreen({ type: 'details', id: act.id, from });
+    else if (act.type === 'collections') setScreen({ type: 'collections' });
+    else if (act.type === 'links') setScreen({ type: 'links', from });
+    else if (act.type === 'payments') setScreen({ type: 'payments', view: act.view ?? {}, from });
+    else if (act.type === 'plans') setScreen({ type: 'plans' });
+  };
+
+  const voiceButton = <VoiceButton onClick={() => setVoice({ ask: true })} />;
+
+  const assistantSheets = (
+    <>
+      {voice?.ask && (
+        <VoiceSheet
+          key={voice.typing ? 'typing' : 'voice'}
+          {...ASK_VOICE}
+          startTyping={Boolean(voice.typing)}
+          extraBody={{ plans: plans.map(({ id, name, prices }) => ({ id, name, prices })) }}
+          chips={askChips}
+          localFallback={(words) => classify(words, data)}
+          onClose={() => setVoice(null)}
+          onResult={(intent, words) => handleAsked(intent, words)}
+        />
+      )}
+      {answer && (
+        <AnswerSheet
+          key={`${answer.result.title}-${answer.result.rows.length}`}
+          asked={answer.asked}
+          result={answer.result}
+          chips={askChips.slice(0, 2)}
+          onAction={runAction}
+          onPickMember={(id) => runAction({ type: 'member', id })}
+          onAskAgain={() => {
+            setAnswer(null);
+            setVoice({ ask: true });
+          }}
+          onTypeInstead={() => {
+            setAnswer(null);
+            setVoice({ ask: true, typing: true });
+          }}
+          onClose={() => setAnswer(null)}
+        />
+      )}
+      {resendFor && <ResendSheet links={resendFor} onResend={resendLink} onClose={() => setResendFor(null)} />}
+      {voice === 'plan' && (
+        <VoiceSheet
+          {...PLAN_VOICE}
+          onClose={() => setVoice(null)}
+          onResult={(fields, transcript) => {
+            setVoice(null);
+            setPlanForm({ voice: { fields, transcript } });
+          }}
+        />
+      )}
+      {voice === 'member' && (
+        <VoiceSheet
+          {...MEMBER_VOICE}
+          extraBody={{ plans: plans.map(({ id, name, prices }) => ({ id, name, prices })) }}
+          onClose={() => setVoice(null)}
+          onResult={(fields, transcript) => {
+            setVoice(null);
+            setScreen({ type: 'form', voice: { fields, transcript }, from: screen });
+          }}
+        />
+      )}
+    </>
+  );
+
   const notice = paidNotice && (
     <button
       key={paidNotice.at}
@@ -320,6 +472,8 @@ export default function MembershipsScreen() {
   return (
     <>
       {renderPage()}
+      {linkSheet}
+      {assistantSheets}
       {notice}
     </>
   );
@@ -360,8 +514,8 @@ export default function MembershipsScreen() {
             onOpenDue={() => setScreen({ type: 'list', which: 'due', from: screen })}
             onOpenPending={() => setScreen({ type: 'list', which: 'active', view: { filter: 'pending' }, from: screen })}
             onOpenPayments={(plan) => setScreen({ type: 'payments', view: { plan }, from: screen })}
+            voiceButton={voiceButton}
           />
-          {linkSheet}
         </>
       );
     }
@@ -374,6 +528,7 @@ export default function MembershipsScreen() {
           onViewChange={(view) => setScreen({ ...screen, view })}
           onBack={() => setScreen(screen.from ?? null)}
           onOpenMember={(id) => setScreen({ type: 'details', id, from: screen })}
+          voiceButton={voiceButton}
         />
       );
     }
@@ -387,7 +542,7 @@ export default function MembershipsScreen() {
           onResend={resendLink}
           onBack={() => {
             setSync((s) => ({ ...s, renewed: [] }));
-            setScreen(null);
+            setScreen(screen.from ?? null);
           }}
         />
       );
@@ -405,8 +560,9 @@ export default function MembershipsScreen() {
             onOpenMember={(id) => setScreen({ type: 'details', id, from: screen })}
             onSendLinks={sendLinksTo}
             onRenewOne={renewOne}
+            onAddMember={() => setScreen({ type: 'form', from: screen })}
+            voiceButton={voiceButton}
           />
-          {linkSheet}
         </>
       );
     }
@@ -426,8 +582,7 @@ export default function MembershipsScreen() {
               }}
               onRenew={() => renewOne(member)}
             />
-            {linkSheet}
-          </>
+            </>
         );
       }
     }
@@ -453,87 +608,37 @@ export default function MembershipsScreen() {
       );
     }
 
-    /* ----- Tabs ----- */
+    /* ----- Plans (own screen, from the Plans card) ----- */
+    if (screen?.type === 'plans') {
+      return (
+        <>
+          <PlansTab
+            plans={plans}
+            members={members}
+            onBack={() => setScreen(null)}
+            onNewPlan={() => setPlanForm('new')}
+            onEditPlan={(id) => setPlanForm(id)}
+            onDeletePlan={deletePlan}
+          />
+          {voiceButton}
+        </>
+      );
+    }
+
+    /* ----- Memberships home: six cards and the voice button ----- */
     return (
-      <div className="white-screen">
-        {/* No page title: the tabs sit at the top, like Transactions / Settlements.
-            To go back, tap Products in the bottom nav. */}
-        <Box paddingTop="spacing.3" />
-        <Tabs value={activeTab} onChange={setActiveTab} variant="bordered" size="small" isFullWidthTabItem>
-          <TabList>
-            <TabItem value="memberships">Memberships</TabItem>
-            <TabItem value="plans">Plans</TabItem>
-          </TabList>
-
-          <Box paddingX="spacing.5" paddingTop="spacing.5">
-            <TabPanel value="memberships">
-              <MembersTab
-                members={members}
-                links={visibleLinks}
-                onOpenList={(which) => setScreen({ type: 'list', which })}
-                onOpenLinks={() => setScreen({ type: 'links' })}
-              onOpenCollections={() => setScreen({ type: 'collections' })}
-              />
-            </TabPanel>
-            <TabPanel value="plans">
-              <PlansTab plans={plans} onEditPlan={(id) => setPlanForm(id)} onDeletePlan={deletePlan} />
-            </TabPanel>
-          </Box>
-        </Tabs>
-
-        {/* Thumb-reach buttons, centred just above the bottom nav */}
-        {activeTab === 'memberships' && (
-          <ThumbActionButton label="New Member" onClick={() => setScreen({ type: 'form' })}>
-            {/* AI: talk to add a member */}
-            <button className="voice-fab" aria-label="Talk to add a member" onClick={() => setVoice('member')}>
-              <MicIcon size="large" color="surface.icon.staticWhite.normal" />
-            </button>
-          </ThumbActionButton>
-        )}
-        {activeTab === 'plans' && (
-          <ThumbActionButton label="New Plan" onClick={() => setPlanForm('new')}>
-            {/* AI: talk to build a plan */}
-            <button className="voice-fab" aria-label="Talk to build a plan" onClick={() => setVoice('plan')}>
-              <MicIcon size="large" color="surface.icon.staticWhite.normal" />
-            </button>
-          </ThumbActionButton>
-        )}
-
-        {voice === 'plan' && (
-          <VoiceSheet
-            {...PLAN_VOICE}
-            onClose={() => setVoice(null)}
-            onResult={(fields, transcript) => {
-              setVoice(null);
-              setPlanForm({ voice: { fields, transcript } });
-            }}
-          />
-        )}
-        {voice === 'member' && (
-          <VoiceSheet
-            {...MEMBER_VOICE}
-            extraBody={{ plans: plans.map(({ id, name, prices }) => ({ id, name, prices })) }}
-            onClose={() => setVoice(null)}
-            onResult={(fields, transcript) => {
-              setVoice(null);
-              setScreen({ type: 'form', voice: { fields, transcript } });
-            }}
-          />
-        )}
-      </div>
+      <>
+        <MembersTab
+          members={members}
+          plans={plans}
+          links={visibleLinks}
+          onOpenList={(which) => setScreen({ type: 'list', which })}
+          onOpenLinks={() => setScreen({ type: 'links' })}
+          onOpenCollections={() => setScreen({ type: 'collections' })}
+          onOpenPlans={() => setScreen({ type: 'plans' })}
+        />
+        {voiceButton}
+      </>
     );
   }
-}
-
-// Floating "+ New ..." button. Position and colour are set in index.css
-// (.thumb-action). `children` = the round mic shown beside it.
-function ThumbActionButton({ label, onClick, children }) {
-  return (
-    <div className="thumb-action">
-      <Button icon={PlusIcon} iconPosition="left" size="large" onClick={onClick}>
-        {label}
-      </Button>
-      {children}
-    </div>
-  );
 }

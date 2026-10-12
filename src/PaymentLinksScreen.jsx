@@ -7,11 +7,9 @@ import {
   Heading,
   Button,
   IconButton,
-  Spinner,
   ChipGroup,
   Chip,
   ArrowLeftIcon,
-  RefreshIcon,
   CloseIcon,
   ExternalLinkIcon,
   CopyIcon,
@@ -179,7 +177,7 @@ function LinkSheet({ link, onClose, onResend }) {
 
 /**
  * Every payment link sent in the last 7 days, with its live status from
- * Razorpay. Refreshes when opened and when ↻ is tapped.
+ * Razorpay. Refreshes when opened, then in the background (every minute while a link is awaiting payment, and when you come back to the app).
  */
 export default function PaymentLinksScreen({ links, sync, onRefresh, onResend, onBack }) {
   const [filter, setFilter] = useState('all');
@@ -205,13 +203,6 @@ export default function PaymentLinksScreen({ links, sync, onRefresh, onResend, o
           <Heading size="medium" weight="semibold">
             Payment links ({links.length})
           </Heading>
-        </Box>
-        <Box paddingRight="spacing.3">
-          {sync.loading ? (
-            <Spinner accessibilityLabel="Updating from Razorpay" size="medium" />
-          ) : (
-            <IconButton icon={RefreshIcon} size="large" accessibilityLabel="Refresh from Razorpay" onClick={onRefresh} />
-          )}
         </Box>
       </Box>
 

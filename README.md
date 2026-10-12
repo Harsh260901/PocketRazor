@@ -24,26 +24,30 @@ Run `npm run dev -- --host`, then open the "Network" link it prints on your phon
 
 - `src/App.jsx` – everything on screen.
   - `shareAndCollect` / `onYourWebsite` lists at the top: edit these to change cards.
-- `src/MembershipsScreen.jsx` – the screen that opens when you tap Memberships, with two tabs: Memberships and Plans. Holds the plans and members and decides which screen is showing. Everything resets when the page reloads (there's no database yet).
-- `src/MembersTab.jsx` – the Memberships home page: collected this month, Active members, Expiring soon (next 7 days) and Expired (last 30 days) cards.
+- `src/MembershipsScreen.jsx` – the screen that opens when you tap Memberships. Holds the plans and members, decides which screen is showing, and runs the voice assistant (what was asked → filled form or answer → confirm screens). Everything resets when the page reloads (there's no database yet).
+- `src/MembersTab.jsx` – the Memberships home page: six cards (Collected this month; Active members and Plans; Expiring soon (next 7 days) and Expired (last 30 days); Payment links) and the voice button. No tabs: Plans has its own screen.
+- `src/VoiceButton.jsx` – the one voice button ("Ask or do anything"), in the same bottom-centre spot on every list and overview screen (home, Active members, Plans, Expiring soon, Expired, Collected this month, October payments, Due list). Member details, forms and the Payment links tracker have no mic. A soft fade sits behind it, it shrinks while you scroll down, and the page leaves space so the last card clears it. Lists and details screens have no mic.
+- `src/assistant.js` – the assistant on the phone: works out every answer from the app's own records (who's expiring, who hasn't paid, has Rahul paid, how much came in, plan counts, unpaid links), plus a keyword version of "what did they ask?" used for the example buttons and when the AI can't be reached.
+- `src/AnswerSheet.jsx` – shows an answer. Anything that moves money says **Review & …** and opens the usual confirm screen (Renew → link or cash; send links → confirm; resend → confirm). Voice never renews, sends or saves on its own. Also: "Which Rao do you mean?" when a name matches several members, and "I can't help with that yet" with examples.
 - `src/CollectionsScreen.jsx` – opens when you tap "Collected this month": a one-screen overview of money in so far (split into Razorpay-verified and cash/UPI recorded by you), what's still to come this month and money by plan.
 - `src/PaymentsScreen.jsx` – every payment this month, grouped by day, with search by name and an All / Razorpay / Cash/UPI filter. Opens from the Collected card (all plans) or from a plan under By plan (shown as a removable tag).
 - `src/CashPaymentSheet.jsx` – the "Link or cash?" choice behind every single-member Renew / Send link button, and the Record cash payment panel.
-- `src/MemberListScreen.jsx` – the Active / Expiring soon / Expired lists. Active has search and an All / Payment pending filter, with Send link on pending members; Expiring and Expired have Renew and Renew all buttons. All of these send Razorpay payment links.
+- `src/MemberListScreen.jsx` – the Active / Expiring soon / Expired / Due lists. Active members is a main screen (keeps the app's bottom bar, pinned header with search and **+ Member**, All / Payment pending filter, voice button; with the pending filter on, "Send payment links to all" takes the mic's place). Every card shows the price; Active uses "Ends …" (orange within 7 days). Expiring soon and Expired are main screens too: **Renew all** in the header (blue, like + Member / + Plan), the total at the top ("₹… if everyone renews" / "₹… to win back"), Renew on each card, and the voice button. Expired says "Expired 3 days ago".
 - `src/MemberDetailsScreen.jsx` – one member's details: contact, status, plan, payment history, Edit and Remove, plus Renew membership / Send payment link for members who need to pay, and the last link sent.
 - `src/MemberFormScreen.jsx` – one form for "New member", "Edit member" and members filled in by voice: name, phone, email (optional), plan, billing option, start date, and "Already paid".
 - `src/membersData.js` – the sample members (48 paid up, 2 with payment pending, generated relative to today), status rules, date formatting and the collections maths. Every sample member's phone is `DEMO_PHONE` (the demo owner's number), so a payment link sent to a sample member can only reach that number.
-- `src/PlansTab.jsx` – the Plans tab: search bar, one card per plan, and the panel that slides up when you tap a plan (prices, edit, delete).
+- `src/PlansTab.jsx` – the Plans screen (from the Plans card): **+ Plan**, search, one card per plan with its member count and starting price, and the panel that slides up when you tap a plan (prices, edit, delete). A plan that members are on can't be deleted (edit it instead).
 - `src/PlanFormScreen.jsx` – one form for both "New plan" and "Edit plan", modelled on Razorpay's dashboard form: plan name (required), plan description (optional), and one or more billing options, each with a billing frequency ("Every 1 Month(s)") and billing amount. Create plan (or Save changes) and Cancel at the bottom. When editing, changing or removing an existing price asks for confirmation and explains that members keep their current amount until their next billing cycle.
 - `src/plansData.js` – the frequency units (weeks, months, years) and friendly names like "Quarterly", the three sample plans, and helpers like rupee formatting. Edit `SAMPLE_PLANS` to change the starting list.
-- `src/VoiceSheet.jsx` – the round mic button's panel, used for both "talk to build a plan" and "talk to add a member". Listens with the browser's speech recognition (Indian English), shows the words live, then sends them to the server. "Type instead" works everywhere, including Firefox.
+- `src/VoiceSheet.jsx` – the listening panel, used by the assistant and by "describe the member / plan". Listens with the browser's speech recognition (Indian English), shows the words live and example questions to tap, then sends the words to the server. "Type instead" works everywhere, including Firefox.
+- `api/ask.js` + `api/_ask.js` – server side of the assistant: Gemini works out only *what* was asked (intent, member name, plan, period, cash or Razorpay). It never sees your members or money and never produces the answer. For "add a member" / "create a plan" it also fills in the form.
 - `api/parse-plan.js` + `api/_parsePlan.js` – server side of voice plans: turns the words into plan fields.
 - `api/parse-member.js` + `api/_parseMember.js` – server side of voice members: turns the words into New member fields, only ever picking one of your existing plans.
 - `api/_gemini.js` – shared by both: adds the secret Gemini key, calls Gemini, retries when it's busy, and falls back to Flash-Lite.
 - `src/SendLinkSheet.jsx` – the "Send payment link" panel behind every Renew / Send link button: confirm, send, then show the result (and the link itself, so you can open it).
 - `api/send-payment-links.js` + `api/_paymentLinks.js` – server side: adds the secret Razorpay keys, creates one Razorpay Payment Link per member for their current plan and billing option, and has Razorpay text it to them.
 - `src/PaymentLinksScreen.jsx` + `src/linksData.js` – the Payment links tracker (see "Tracking sent links" below).
-- `src/index.css` – the phone frame, the two-column card grid, and small tweaks so the tabs match the real app (blue underline, even spacing).
+- `src/index.css` – the phone frame, the two-column card grid, the voice button and answer styles, and small tweaks to match the real app.
 - `src/main.jsx` – wraps the app in Blade's theme (`BladeProvider`).
 
 Blade component docs: https://blade.razorpay.com
@@ -76,6 +80,15 @@ Open `.env.local` in any text editor (on a Mac: `open -e .env.local`), replace `
 - If the key ever leaks, delete it in AI Studio and create a new one, then update `.env.local` and Vercel.
 - The microphone only works on `https://` pages or `localhost`. Test voice on your phone using the Vercel link, not the `--host` network address.
 
+## Voice assistant ("Ask or do anything")
+
+- **Where:** the mic at the bottom of home, Active members, Plans, Expiring soon, Expired, Collected this month and the screens it opens (October payments, Due by month-end, Payment pending). Each screen suggests example questions about what's on it.
+- **Questions** (answered from your records): who's expiring this week/month, who's expired, who hasn't paid, has *name* paid / which plan is *name* on, how much came in this month (total, cash, via Razorpay, or from a plan), who paid this week, how many are on a plan / what it costs, which payment links haven't been paid.
+- **Any other question, in any wording** (needs the Gemini key): "Which plan earns the most this month?", "Whose membership ends in November?", "Who has been with me the longest?", "How much has Rahul paid in total?", "Biggest payment last month?". Gemini turns the question into a lookup (which records, which filters, what to add up); the app runs it on its own records (`runQuery` in `src/assistant.js`), so names and numbers never come from the AI.
+- **Commands:** "Add Meera Iyer, 98765 43210, yoga monthly, paid cash" opens the New member form filled in; "Create a Zumba plan, ₹999 a month" opens the New plan form. Nothing is saved until you tap Save.
+- **Human in the loop:** "Renew Rahul" or "renew everyone expiring today" never acts. Group answers list the members with a tick box each (all ticked); untick anyone you don't want, then **Review & send links (N)** opens the usual confirm screen.
+- **No key or AI busy?** The example questions still work (they're answered on the phone), and typed or spoken questions fall back to a simple keyword match.
+
 ## Payment links (Razorpay): setting up your keys
 
 Renew, Renew all, Send link and Send payment link all create a **Razorpay Payment Link** for the member's current plan and billing option, and Razorpay texts it to them. The keys live only on the server, exactly like the Gemini key.
@@ -106,7 +119,7 @@ Add the same two as Environment Variables (Production and Preview), then **Deplo
 ## Tracking sent links
 
 - **Home card "Payment links · last 7 days"**: how many links you sent and how many got paid in the last 7 days (each link can be paid for 2 days), plus how many are still awaiting payment and for how much.
-- **Payment links screen** (tap the card): every link sent in the **last 7 days** (for members currently in the app), loaded live from Razorpay, so it survives a page reload. Filter by Awaiting / Paid / Expired. Tap ↻ to refresh.
+- **Payment links screen** (tap the card): every link sent in the **last 7 days** (for members currently in the app), loaded live from Razorpay, so it survives a page reload. Filter by Awaiting / Paid / Expired. It refreshes on its own: when you open it, then in the background (see below).
 - **Automatic check:** while any link is awaiting payment, the app asks Razorpay **every minute**, and straight away when you switch back to its tab. If someone has paid, they're renewed and a notice pops up ("Rahul Kumar paid. Membership renewed."); tap it to open the tracker. It pauses while the tab is hidden or nothing is awaiting. The timing is `CHECK_EVERY_MS` in `src/linksData.js`. (This runs in the open app, not as a Vercel cron job: Vercel's free plan only allows cron jobs once a day, and the members live in the browser anyway.)
 - **Tap a link** to see when it was sent, whether it was paid (and how), when it expires, plus Open, Copy and **Resend SMS** (texts the same link again).
 - When a link shows as paid, the member is renewed once: a pending member becomes active, and anyone else gets one more billing period with the payment recorded as "UPI · payment link" (or whichever method they used).

@@ -693,3 +693,171 @@ body {
   font-weight: 600;
   cursor: pointer;
 }
+
+/* ---------- The voice button (Memberships main screens) ---------- */
+/* Fixed to the phone frame (it has a transform), just above the 64px bottom nav */
+.voice-fade {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 64px;
+  height: 120px;
+  background: linear-gradient(rgba(255, 255, 255, 0), #fff 60%);
+  pointer-events: none;
+  z-index: 100;
+}
+.voice-dock {
+  position: fixed;
+  left: 50%;
+  bottom: 78px;
+  transform: translateX(-50%);
+  z-index: 101;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.voice-main {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  border: 1px solid #4d7ee6;
+  background: #608de9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 0 0 8px rgba(96, 141, 233, 0.16), 0 8px 18px rgba(77, 126, 230, 0.35);
+  transition: width 0.18s ease, height 0.18s ease, box-shadow 0.18s ease;
+}
+.voice-main:active { background: #4d7ee6; }
+.voice-label {
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  color: #1566f1;
+  transition: opacity 0.15s ease;
+}
+.voice-dock.is-compact { bottom: 86px; }
+.voice-dock.is-compact .voice-main { width: 48px; height: 48px; box-shadow: 0 6px 16px rgba(77, 126, 230, 0.35); }
+.voice-dock.is-compact .voice-label { opacity: 0; height: 0; overflow: hidden; }
+/* Room at the end of the page so the last card can scroll above the button */
+.screen:has(.voice-dock) { padding-bottom: 170px; }
+
+/* A main screen inside the app (keeps the bottom nav), with a pinned header */
+.main-screen { background: #fff; min-height: 100%; }
+.main-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: #fff;
+  padding: 0 20px 8px;
+}
+.main-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 0 8px;
+  margin-left: -8px;
+}
+.main-body { padding: 4px 20px 0; }
+/* Action bar that takes the voice button's place (e.g. "Send payment links to all") */
+.main-action-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 64px;
+  z-index: 102;
+  background: #fff;
+  padding: 10px 20px;
+  border-top: 1px solid #eef0f3;
+}
+.screen:has(.main-action-bar) { padding-bottom: 150px; }
+
+/* Header "+ Member" / "+ Plan" */
+.header-add button { white-space: nowrap; }
+
+/* Example questions in the voice panel */
+.ask-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin: 14px 0 6px;
+}
+.ask-chips button {
+  border: 1px solid #c9d7f7;
+  background: #f5f8ff;
+  color: #1566f1;
+  border-radius: 16px;
+  padding: 6px 12px;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+/* Voice answers */
+.answer-rows { margin-top: 10px; }
+.answer-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 0;
+  border: none;
+  border-bottom: 1px solid #eef0f3;
+  background: none;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  color: #1b2533;
+  text-align: left;
+}
+.answer-row:last-child { border-bottom: none; }
+button.answer-row { cursor: pointer; }
+.answer-row b { white-space: nowrap; font-weight: 600; }
+.answer-split { display: flex; gap: 8px; margin-top: 10px; }
+.answer-split > div { flex: 1; border-radius: 10px; padding: 8px 10px; font-family: 'Inter', sans-serif; font-size: 12.5px; color: #5b6b7d; }
+.answer-split b { display: block; font-size: 15px; color: #1b2533; }
+.answer-lock {
+  margin-top: 12px;
+  border-radius: 10px;
+  background: #f5f6f8;
+  padding: 10px 12px;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  color: #3d4a5c;
+  line-height: 1.45;
+}
+.answer-choice {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  margin-top: 8px;
+  padding: 12px 14px;
+  border: 1px solid #e3e6eb;
+  border-radius: 10px;
+  background: #fff;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  color: #1b2533;
+  cursor: pointer;
+}
+.plan-delete-note {
+  border-radius: 8px;
+  background: #fdf3e2;
+  color: #7a4300;
+  padding: 9px 11px;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.screen:has(.main-screen) { background: #fff; }
+.phone:has(.main-screen) { background: #fff; }
+.answer-row.is-pick { justify-content: flex-start; cursor: pointer; }
+.answer-row.is-pick input { width: 18px; height: 18px; accent-color: #1566f1; margin: 0; flex-shrink: 0; }
+/* Long group answers scroll inside the panel */
+.sheet:has(.is-pick) .answer-rows { max-height: 300px; overflow-y: auto; }
+/* Header action buttons ("+ Member", "+ Plan", "Renew all"): Razorpay blue, white text */
+.header-add.rzp-blue-btn button { box-shadow: none !important; }

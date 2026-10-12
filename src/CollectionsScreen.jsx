@@ -41,7 +41,7 @@ const tappable = (onClick, label) => ({
  * money in so far (split into Razorpay-verified and recorded by you), what's
  * still to come and money by plan. Tap the total or a plan to see payments.
  */
-export default function CollectionsScreen({ members, onBack, onOpenDue, onOpenPending, onOpenPayments }) {
+export default function CollectionsScreen({ members, onBack, onOpenDue, onOpenPending, onOpenPayments, voiceButton = null }) {
   const r = monthReport(members);
   const now = new Date();
   const month = MONTHS[now.getMonth()];
@@ -50,15 +50,17 @@ export default function CollectionsScreen({ members, onBack, onOpenDue, onOpenPe
   const progress = expectedTotal ? Math.round((r.thisMonth / expectedTotal) * 100) : 0;
 
   return (
-    <div className="full-screen">
-      <Box display="flex" alignItems="center" gap="spacing.2" paddingX="spacing.3" paddingY="spacing.3">
-        <IconButton icon={ArrowLeftIcon} size="large" accessibilityLabel="Back" onClick={onBack} />
-        <Heading size="medium" weight="semibold">
-          {month} collections
-        </Heading>
-      </Box>
+    <div className="main-screen">
+      <div className="main-header">
+        <div className="main-header-row" style={{ justifyContent: 'flex-start' }}>
+          <IconButton icon={ArrowLeftIcon} size="large" accessibilityLabel="Back" onClick={onBack} />
+          <Heading size="medium" weight="semibold">
+            {month} collections
+          </Heading>
+        </div>
+      </div>
 
-      <div className="full-screen-body">
+      <div className="main-body">
         {/* Money in so far */}
         <div className="detail-box collect-hero is-tappable" {...tappable(() => onOpenPayments(null), 'See all payments this month')}>
           <Box display="flex" justifyContent="space-between" alignItems="center">
@@ -159,6 +161,7 @@ export default function CollectionsScreen({ members, onBack, onOpenDue, onOpenPe
           </>
         )}
       </div>
+      {voiceButton}
     </div>
   );
 }

@@ -14,12 +14,20 @@ import {
   EditIcon,
   LayersIcon,
   SearchIcon,
+  ArrowLeftIcon,
+  PlusIcon,
 } from '@razorpay/blade/components';
 import { formatRupees, optionsSummary, frequencyLabel, sortPrices } from './plansData.js';
+import { memberStatus } from './membersData.js';
 
 /* ---------- One card in the list: name + "3 options · Monthly, ..." ---------- */
 
-function PlanCard({ plan, onOpen }) {
+// Members currently on a plan (paid up or waiting for their first payment)
+export const membersOnPlan = (plan, members) =>
+  members.filter((m) => m.planId === plan.id && ['active', 'expiring', 'pending'].includes(memberStatus(m)));
+const fromPrice = (plan) => Math.min(...plan.prices.map((p) => p.amount));
+
+function PlanCard({ plan, count, onOpen }) {
   return (
     <Card
       onClick={onOpen}
@@ -37,6 +45,9 @@ function PlanCard({ plan, onOpen }) {
             {optionsSummary(plan.prices)}
           </Text>
         </Box>
+        <Text size="small" color="surface.text.gray.muted">
+          {count} {count === 1 ? 'member' : 'members'} · from {formatRupees(fromPrice(plan))}
+        </Text>
       </CardBody>
     </Card>
   );
@@ -44,7 +55,7 @@ function PlanCard({ plan, onOpen }) {
 
 /* ---------- Panel that slides up when a plan is tapped ---------- */
 
-function PlanSheet({ plan, onClose, onEdit, onDelete }) {
+function PlanSheet({ plan, count, onClose, onEdit, onDelete }) {
   const [confirming, setConfirming] = useState(false);
 
   return (
@@ -59,13 +70,11 @@ function PlanSheet({ plan, onClose, onEdit, onDelete }) {
           </Heading>
           <IconButton icon={CloseIcon} accessibilityLabel="Close" onClick={onClose} />
         </Box>
-        {plan.description && (
-          <Box marginTop="spacing.1">
-            <Text size="small" color="surface.text.gray.muted">
-              {plan.description}
-            </Text>
-          </Box>
-        )}
+        <Box marginTop="spacing.1">
+          <Text size="small" color="surface.text.gray.muted">
+            {[plan.description, `${count} ${count === 1 ? 'member' : 'members'}`].filter(Boolean).join(' · ')}
+          </Text>
+        </Box>
 
         {/* One row per price */}
         <Box marginTop="spacing.4">
@@ -97,10 +106,18 @@ function PlanSheet({ plan, onClose, onEdit, onDelete }) {
                 icon={TrashIcon}
                 iconPosition="left"
                 isFullWidth
+                isDisabled={count > 0}
                 onClick={() => setConfirming(true)}
               >
                 Delete plan
               </Button>
+              {/* Can't delete a plan people are on: their renewals depend on it */}
+              {count > 0 && (
+                <div className="plan-delete-note">
+                  {count} {count === 1 ? 'member is' : 'members are'} on this plan, so it can't be deleted yet. You can still
+                  edit it; price changes apply from each member's next renewal.
+                </div>
+              )}
             </Box>
           ) : (
             <Box>
@@ -154,9 +171,9 @@ function Empty({ icon: Icon, title, description }) {
   );
 }
 
-/* ---------- The Plans tab ---------- */
+/* ---------- The Plans screen (opens from the Plans card on the home page) ---------- */
 
-export default function PlansTab({ plans, onEditPlan, onDeletePlan }) {
+export default function PlansTab({ plans, members, onBack, onNewPlan, onEditPlan, onDeletePlan }) {
   const [query, setQuery] = useState('');
   const [openPlanId, setOpenPlanId] = useState(null);
 
@@ -164,43 +181,57 @@ export default function PlansTab({ plans, onEditPlan, onDeletePlan }) {
   const visible = q ? plans.filter((p) => p.name.toLowerCase().includes(q)) : plans;
   const openPlan = plans.find((p) => p.id === openPlanId);
 
-  if (plans.length === 0) {
-    return (
-      <Empty
-        icon={LayersIcon}
-        title="No plans yet"
-        description="Create a plan to start collecting membership fees."
-      />
-    );
-  }
-
   return (
-    <Box>
-      <SearchInput
-        accessibilityLabel="Search plans"
-        placeholder="Search plans"
-        value={query}
-        onChange={({ value }) => setQuery(value ?? '')}
-        onClearButtonClick={() => setQuery('')}
-      />
-
-      <Box marginTop="spacing.4" display="flex" flexDirection="column" gap="spacing.3">
-        {visible.map((plan) => (
-          <PlanCard key={plan.id} plan={plan} onOpen={() => setOpenPlanId(plan.id)} />
-        ))}
-        {visible.length === 0 && (
-          <Empty
-            icon={SearchIcon}
-            title="No matching plans"
-            description={`Nothing matches "${query.trim()}". Try another name.`}
+    <div className="main-screen">
+      <div className="main-header">
+        <div className="main-header-row">
+          <Box display="flex" alignItems="center" gap="spacing.2">
+            <IconButton icon={ArrowLeftIcon} size="large" accessibilityLabel="Back" onClick={onBack} />
+            <Heading size="medium" weight="semibold">
+              Plans
+            </Heading>
+          </Box>
+          <div className="header-add rzp-blue-btn">
+            <Button size="small" icon={PlusIcon} iconPosition="left" onClick={onNewPlan}>
+              Plan
+            </Button>
+          </div>
+        </div>
+        {plans.length > 0 && (
+          <SearchInput
+            accessibilityLabel="Search plans"
+            placeholder="Search plans"
+            value={query}
+            onChange={({ value }) => setQuery(value ?? '')}
+            onClearButtonClick={() => setQuery('')}
           />
         )}
-      </Box>
+      </div>
+
+      <div className="main-body">
+        {plans.length === 0 ? (
+          <Empty icon={LayersIcon} title="No plans yet" description="Create a plan to start collecting membership fees." />
+        ) : (
+          <Box display="flex" flexDirection="column" gap="spacing.3">
+            {visible.map((plan) => (
+              <PlanCard key={plan.id} plan={plan} count={membersOnPlan(plan, members).length} onOpen={() => setOpenPlanId(plan.id)} />
+            ))}
+            {visible.length === 0 && (
+              <Empty
+                icon={SearchIcon}
+                title="No matching plans"
+                description={`Nothing matches "${query.trim()}". Try another name.`}
+              />
+            )}
+          </Box>
+        )}
+      </div>
 
       {openPlan && (
         <PlanSheet
           key={openPlan.id}
           plan={openPlan}
+          count={membersOnPlan(openPlan, members).length}
           onClose={() => setOpenPlanId(null)}
           onEdit={() => {
             setOpenPlanId(null);
@@ -212,6 +243,6 @@ export default function PlansTab({ plans, onEditPlan, onDeletePlan }) {
           }}
         />
       )}
-    </Box>
+    </div>
   );
 }

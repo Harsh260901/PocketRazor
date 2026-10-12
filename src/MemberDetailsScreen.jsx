@@ -25,7 +25,7 @@ const BADGES = {
 
 function badgeText(m, status) {
   if (status === 'pending') return 'Payment pending';
-  if (status === 'active') return `Active till ${fmtDay(m.periodEnd)}`;
+  if (status === 'active') return `Active · ends ${fmtDay(m.periodEnd)}`;
   return expiryText(m);
 }
 

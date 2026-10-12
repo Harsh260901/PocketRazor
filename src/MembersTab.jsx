@@ -1,6 +1,7 @@
-import { Box, Card, CardBody, Text, UsersIcon, ClockIcon, AlertCircleIcon, ChevronRightIcon, LinkIcon } from '@razorpay/blade/components';
+import { Box, Card, CardBody, Text, Heading, UsersIcon, ClockIcon, AlertCircleIcon, ChevronRightIcon, LinkIcon, LayersIcon } from '@razorpay/blade/components';
 import { formatRupees } from './plansData.js';
-import { collections, memberStatus, isActive } from './membersData.js';
+import { collections, memberStatus } from './membersData.js';
+import { membersFor } from './MemberListScreen.jsx';
 import { weekSummary } from './linksData.js';
 
 // One tappable summary card (Active members / Expiring soon / Expired)
@@ -36,108 +37,113 @@ const GREY = { icon: 'surface.icon.gray.muted', text: 'surface.text.gray.muted' 
 const AMBER = { icon: 'feedback.icon.notice.intense', text: 'feedback.text.notice.intense' };
 const RED = { icon: 'feedback.icon.negative.intense', text: 'feedback.text.negative.intense' };
 
-/** The Memberships home page: collections + three member cards. */
-export default function MembersTab({ members, links = [], onOpenList, onOpenLinks, onOpenCollections }) {
+/** The Memberships home page: six overview cards (the voice button sits below them). */
+export default function MembersTab({ members, plans, links = [], onOpenList, onOpenLinks, onOpenCollections, onOpenPlans }) {
   const statuses = members.map((m) => memberStatus(m));
-  const active = members.filter(isActive);
+  const onBooks = membersFor('active', members); // paid up + payment pending
   const expiringCount = statuses.filter((s) => s === 'expiring').length;
   const expiredCount = statuses.filter((s) => s === 'expired').length;
   const pendingCount = statuses.filter((s) => s === 'pending').length;
-  const planCount = new Set(active.map((m) => m.planId)).size;
   const money = collections(members);
   const week = weekSummary(links);
-
-  const activeSub = [
-    `Across ${planCount} ${planCount === 1 ? 'plan' : 'plans'}`,
-    pendingCount ? `${pendingCount} payment pending` : null,
-  ]
-    .filter(Boolean)
-    .join(' · ');
+  const planNames = plans.map((p) => p.name.split(' ')[0]).join(', ');
 
   return (
-    <Box display="flex" flexDirection="column" gap="spacing.4">
-      {/* Money first: what the merchant cares about most */}
-      <Card
-        onClick={onOpenCollections}
-        accessibilityLabel="Collected this month"
-        elevation="none"
-        padding="spacing.4"
-        borderRadius="large"
-      >
-        <CardBody>
-          <Box display="flex" justifyContent="space-between" alignItems="flex-start">
-            <Text size="small" color="surface.text.gray.muted">
-              Collected this month
-            </Text>
-            <ChevronRightIcon size="small" color="surface.icon.gray.muted" />
-          </Box>
-          <Box marginTop="spacing.1">
-            <Text size="xlarge" weight="semibold" color="surface.text.gray.normal">
-              {formatRupees(money.thisMonth)}
-            </Text>
-          </Box>
-          <Text size="small" color="surface.text.gray.muted">
-            {money.change !== null ? (
-              <>
-                <span style={{ color: money.change >= 0 ? '#0a8a4f' : '#d92d20', fontWeight: 600 }}>
-                  {money.change >= 0 ? '↑' : '↓'} {Math.abs(money.change)}%
-                </span>{' '}
-                vs last month
-              </>
-            ) : (
-              <>Last month {formatRupees(money.lastMonthTotal)}</>
-            )}
-            {money.dueThisWeek > 0 && <> · {formatRupees(money.dueThisWeek)} due this week</>}
-          </Text>
-        </CardBody>
-      </Card>
-
-      <StatCard
-        icon={UsersIcon}
-        label="Active members"
-        labelColor={GREY}
-        value={active.length}
-        sub={activeSub}
-        onClick={() => onOpenList('active')}
-      />
-
-      <div className="stat-pair">
-        <StatCard
-          icon={ClockIcon}
-          label="Expiring soon"
-          labelColor={AMBER}
-          value={expiringCount}
-          sub="Next 7 days"
-          onClick={() => onOpenList('expiring')}
-        />
-        <StatCard
-          icon={AlertCircleIcon}
-          label="Expired"
-          labelColor={RED}
-          value={expiredCount}
-          sub="Last 30 days"
-          onClick={() => onOpenList('expired')}
-        />
+    <div className="main-screen">
+      <div className="main-header" style={{ paddingTop: 12 }}>
+        <Heading size="large" weight="semibold">
+          Memberships
+        </Heading>
       </div>
+      <div className="main-body">
+        <Box display="flex" flexDirection="column" gap="spacing.4">
+          {/* Money first: what the merchant cares about most */}
+          <Card onClick={onOpenCollections} accessibilityLabel="Collected this month" elevation="none" padding="spacing.4" borderRadius="large">
+            <CardBody>
+              <Box display="flex" justifyContent="space-between" alignItems="flex-start">
+                <Text size="small" color="surface.text.gray.muted">
+                  Collected this month
+                </Text>
+                <ChevronRightIcon size="small" color="surface.icon.gray.muted" />
+              </Box>
+              <Box marginTop="spacing.1">
+                <Text size="xlarge" weight="semibold" color="surface.text.gray.normal">
+                  {formatRupees(money.thisMonth)}
+                </Text>
+              </Box>
+              <Text size="small" color="surface.text.gray.muted">
+                {money.change !== null ? (
+                  <>
+                    <span style={{ color: money.change >= 0 ? '#0a8a4f' : '#d92d20', fontWeight: 600 }}>
+                      {money.change >= 0 ? '↑' : '↓'} {Math.abs(money.change)}%
+                    </span>{' '}
+                    vs last month
+                  </>
+                ) : (
+                  <>Last month {formatRupees(money.lastMonthTotal)}</>
+                )}
+              </Text>
+            </CardBody>
+          </Card>
 
-      {/* Payment links sent in the last 7 days (each link is valid for 2 days) */}
-      <StatCard
-        icon={LinkIcon}
-        label="Payment links · last 7 days"
-        labelColor={GREY}
-        value={week.sent ? `${week.sent} sent` : 'None yet'}
-        sub={
-          week.sent || week.awaiting
-            ? [
-                week.paid ? `${week.paid} paid` : null,
-                week.awaiting ? `${week.awaiting} awaiting · ${formatRupees(week.awaitingAmount)}` : null,
-              ]
-                .filter(Boolean)
-                .join(' · ') || 'Tap to check payments'
-            : 'Track the links you send here'
-        }
-        onClick={onOpenLinks}
-      />
-    </Box>
+          <div className="stat-pair">
+            <StatCard
+              icon={UsersIcon}
+              label="Active members"
+              labelColor={GREY}
+              value={onBooks.length}
+              sub={pendingCount ? `${pendingCount} payment pending` : 'All paid up'}
+              onClick={() => onOpenList('active')}
+            />
+            <StatCard
+              icon={LayersIcon}
+              label="Plans"
+              labelColor={GREY}
+              value={plans.length}
+              sub={plans.length ? planNames : 'Create your first plan'}
+              onClick={onOpenPlans}
+            />
+          </div>
+
+          <div className="stat-pair">
+            <StatCard
+              icon={ClockIcon}
+              label="Expiring soon"
+              labelColor={AMBER}
+              value={expiringCount}
+              sub="Next 7 days"
+              onClick={() => onOpenList('expiring')}
+            />
+            <StatCard
+              icon={AlertCircleIcon}
+              label="Expired"
+              labelColor={RED}
+              value={expiredCount}
+              sub="Last 30 days"
+              onClick={() => onOpenList('expired')}
+            />
+          </div>
+
+          {/* Payment links sent in the last 7 days (each link is valid for 2 days) */}
+          <StatCard
+            icon={LinkIcon}
+            label="Payment links · last 7 days"
+            labelColor={GREY}
+            value={week.sent ? `${week.sent} sent` : 'None yet'}
+            sub={
+              week.sent || week.awaiting
+                ? [
+                    week.paid ? `${week.paid} paid` : null,
+                    week.awaiting ? `${week.awaiting} awaiting · ${formatRupees(week.awaitingAmount)}` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ') || 'Tap to check payments'
+                : 'Track the links you send here'
+            }
+            onClick={onOpenLinks}
+          />
+        </Box>
+      </div>
+    </div>
   );
 }

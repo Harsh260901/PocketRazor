@@ -12,6 +12,8 @@ import {
   ArrowLeftIcon,
   UsersIcon,
   SearchIcon,
+  PlusIcon,
+  CloseIcon,
 } from '@razorpay/blade/components';
 import { memberStatus, expiryText, endsText, fmtDay, initials, sentAgo, dueThisMonth, endOfMonth, daysBetween, today } from './membersData.js';
 import { frequencyLabel, formatRupees } from './plansData.js';
@@ -36,6 +38,14 @@ export function membersFor(which, members) {
     return members.filter((m) => memberStatus(m) === 'expiring').sort((a, b) => a.periodEnd - b.periodEnd);
   }
   return members.filter((m) => memberStatus(m) === 'expired').sort((a, b) => b.periodEnd - a.periodEnd);
+}
+
+// "Expired today" / "Expired yesterday" / "Expired 3 days ago"
+function expiredAgo(m) {
+  const d = daysBetween(m.periodEnd, today());
+  if (d <= 0) return 'Expired today';
+  if (d === 1) return 'Expired yesterday';
+  return `Expired ${d} days ago`;
 }
 
 export function Avatar({ name, size = 32, highlight = false }) {
@@ -65,8 +75,9 @@ function MemberCard({ member, which, onOpen, onSendLink }) {
       ) : (
         endsText(member)
       );
-  else if (which === 'expired') line3 = <span style={{ color: '#d92d20' }}>{expiryText(member)}</span>;
-  else line3 = `Till ${fmtDay(member.periodEnd)}`;
+  else if (which === 'expired') line3 = <span style={{ color: '#d92d20' }}>{expiredAgo(member)}</span>;
+  // Active: same "Ends …" wording as everywhere; orange = ends in the next 7 days
+  else line3 = status === 'expiring' ? <span style={{ color: '#b45309' }}>{endsText(member)}</span> : endsText(member);
   const sentNote = needsLink && member.linkSent ? (
     <span style={{ color: '#0a7a46' }}> · Link sent {sentAgo(member.linkSent.sentAt)}</span>
   ) : null;
@@ -83,7 +94,7 @@ function MemberCard({ member, which, onOpen, onSendLink }) {
               </Text>
               <Text size="small" color="surface.text.gray.muted">
                 {member.planName} · {frequencyLabel(member.price)}
-                {(isPending || which === 'due') && ` · ${formatRupees(member.price.amount)}`}
+                {` · ${formatRupees(member.price.amount)}`}
               </Text>
               <Text size="small" color="surface.text.gray.muted">
                 {line3}
@@ -106,15 +117,23 @@ function MemberCard({ member, which, onOpen, onSendLink }) {
   );
 }
 
-/** Full-screen list for Active members, Expiring soon or Expired. */
-// `view` holds the search text and filter ('all' | 'pending'), kept by the
-// parent so they're still there when you come back from a member's details.
-export default function MemberListScreen({ which, members, view = {}, onViewChange, onBack, onOpenMember, onSendLinks, onRenewOne }) {
+/**
+ * Member lists. Active members, Expiring soon and Expired are main screens
+ * (keep the app's bottom bar, header pinned, voice button below): Active has
+ * "+ Member" in the header, Expiring and Expired have "Renew all" there.
+ * The Due list (opened from Collections) has no header button. With the
+ * Payment pending filter on, Active's header button becomes "Send links".
+ * `view` holds the search text, filter ('all' | 'pending') and plan, kept by
+ * the parent so they're still there when you come back from a member.
+ */
+export default function MemberListScreen({ which, members, view = {}, onViewChange, onBack, onOpenMember, onSendLinks, onRenewOne, onAddMember, voiceButton = null }) {
   const query = view.query ?? '';
   const filter = view.filter ?? 'all';
+  const planFilter = view.plan ?? null;
   const setQuery = (q) => onViewChange({ ...view, query: q });
   const setFilter = (f) => onViewChange({ ...view, filter: f });
-  const all = membersFor(which, members);
+  const everyone = membersFor(which, members);
+  const all = planFilter ? everyone.filter((m) => m.planName === planFilter) : everyone;
   const pendingCount = which === 'active' ? all.filter((m) => memberStatus(m) === 'pending').length : 0;
   // If the last pending member pays or is removed, fall back to All
   const activeFilter = pendingCount ? filter : 'all';
@@ -124,92 +143,133 @@ export default function MemberListScreen({ which, members, view = {}, onViewChan
   const shown = q
     ? filtered.filter((m) => m.name.toLowerCase().includes(q) || (qDigits && m.phone.includes(qDigits)))
     : filtered;
-  // The Active list's header counts paid-up members, matching the home card
-  const headerCount = which === 'active' ? all.length - pendingCount : all.length;
+  const total = all.reduce((sum, m) => sum + m.price.amount, 0);
+  // Active, Expiring soon and Expired are main screens (bottom bar + voice button);
+  // the Due list (opened from Collections) stays a full-screen list
+  const isMain = true; // every list keeps the app's bottom bar and the voice button
+
+  const title = (
+    <Box display="flex" alignItems="center" gap="spacing.2">
+      <IconButton icon={ArrowLeftIcon} size="large" accessibilityLabel="Back" onClick={onBack} />
+      <Heading size="medium" weight="semibold">
+        {LISTS[which].title} ({all.length})
+      </Heading>
+    </Box>
+  );
+
+  const summary =
+    which === 'due' ? `${formatRupees(total)} if everyone renews`
+    : which === 'expiring' ? `${formatRupees(total)} if everyone renews · next 7 days`
+    : which === 'expired' ? `${formatRupees(total)} to win back · last 30 days`
+    : null;
+
+  const filters = (
+    <>
+      {which === 'active' && everyone.length > 0 && (
+        <Box marginBottom="spacing.3">
+          <SearchInput
+            accessibilityLabel="Search members"
+            placeholder="Search by name or phone"
+            value={query}
+            onChange={({ value }) => setQuery(value ?? '')}
+            onClearButtonClick={() => setQuery('')}
+          />
+        </Box>
+      )}
+      {/* Came from "Who's on Gold gym?": show the plan, tap ✕ to see everyone */}
+      {planFilter && (
+        <button className="plan-tag" onClick={() => onViewChange({ ...view, plan: null })} aria-label={`Remove ${planFilter} filter`}>
+          {planFilter}
+          <CloseIcon size="small" color="interactive.icon.primary.normal" />
+        </button>
+      )}
+      {/* Filter: only shown when someone hasn't paid yet */}
+      {pendingCount > 0 && (
+        <Box marginBottom="spacing.2">
+          <ChipGroup
+            accessibilityLabel="Filter members"
+            selectionType="single"
+            size="small"
+            value={activeFilter}
+            onChange={({ values }) => setFilter(values[0] ?? 'all')}
+          >
+            <Chip value="all">{`All (${all.length})`}</Chip>
+            <Chip value="pending">{`Payment pending (${pendingCount})`}</Chip>
+          </ChipGroup>
+        </Box>
+      )}
+    </>
+  );
+
+  const list = (
+    <>
+      {summary && all.length > 0 && (
+        <Box marginBottom="spacing.4">
+          <Text size="small" color="surface.text.gray.muted">
+            {summary}
+          </Text>
+        </Box>
+      )}
+      <Box display="flex" flexDirection="column" gap="spacing.3">
+        {shown.map((m) => (
+          <MemberCard key={m.id} member={m} which={which} onOpen={() => onOpenMember(m.id)} onSendLink={() => onRenewOne(m)} />
+        ))}
+      </Box>
+      {shown.length === 0 && (
+        <Box display="flex" flexDirection="column" alignItems="center" gap="spacing.3" paddingY="spacing.8">
+          {q ? <SearchIcon size="xlarge" color="surface.icon.gray.muted" /> : <UsersIcon size="xlarge" color="surface.icon.gray.muted" />}
+          <Text size="medium" color="surface.text.gray.muted" textAlign="center">
+            {q ? `No members match "${query.trim()}".` : LISTS[which].empty}
+          </Text>
+        </Box>
+      )}
+    </>
+  );
+
+  if (isMain) {
+    return (
+      <div className="main-screen">
+        <div className="main-header">
+          <div className="main-header-row">
+            {title}
+            {which === 'active' && activeFilter === 'pending' ? (
+              // Pending filter: send everyone who hasn't paid a link (confirm screen first)
+              <div className="header-add rzp-blue-btn">
+                <Button size="small" onClick={() => onSendLinks(filtered)}>
+                  {`Send links (${pendingCount})`}
+                </Button>
+              </div>
+            ) : which === 'active' ? (
+              <div className="header-add rzp-blue-btn">
+                <Button size="small" icon={PlusIcon} iconPosition="left" onClick={onAddMember}>
+                  Member
+                </Button>
+              </div>
+            ) : which === 'due' ? null : (
+              all.length > 0 && (
+                // Send everyone in this list a payment link (confirm screen first)
+                <div className="header-add rzp-blue-btn">
+                  <Button size="small" onClick={() => onSendLinks(all)}>
+                    Renew all
+                  </Button>
+                </div>
+              )
+            )}
+          </div>
+          {filters}
+        </div>
+        <div className="main-body">{list}</div>
+        {voiceButton}
+      </div>
+    );
+  }
 
   return (
     <div className="full-screen">
-      <Box display="flex" alignItems="center" gap="spacing.2" paddingX="spacing.3" paddingY="spacing.3">
-        <IconButton icon={ArrowLeftIcon} size="large" accessibilityLabel="Back" onClick={onBack} />
-        <Heading size="medium" weight="semibold">
-          {LISTS[which].title} ({headerCount})
-        </Heading>
+      <Box paddingX="spacing.3" paddingY="spacing.3">
+        {title}
       </Box>
-
-      <div className="full-screen-body">
-        {which === 'due' && all.length > 0 && (
-          <Box marginBottom="spacing.4">
-            <Text size="small" color="surface.text.gray.muted">
-              {formatRupees(all.reduce((sum, m) => sum + m.price.amount, 0))} if everyone renews
-            </Text>
-          </Box>
-        )}
-        {which === 'active' && all.length > 0 && (
-          <Box marginBottom="spacing.4">
-            <SearchInput
-              accessibilityLabel="Search members"
-              placeholder="Search by name or phone"
-              value={query}
-              onChange={({ value }) => setQuery(value ?? '')}
-              onClearButtonClick={() => setQuery('')}
-            />
-          </Box>
-        )}
-
-        {/* Filter: only shown when someone hasn't paid yet */}
-        {pendingCount > 0 && (
-          <Box marginBottom="spacing.4">
-            <ChipGroup
-              accessibilityLabel="Filter members"
-              selectionType="single"
-              size="small"
-              value={activeFilter}
-              onChange={({ values }) => setFilter(values[0] ?? 'all')}
-            >
-              <Chip value="all">{`All (${all.length})`}</Chip>
-              <Chip value="pending">{`Payment pending (${pendingCount})`}</Chip>
-            </ChipGroup>
-          </Box>
-        )}
-
-        <Box display="flex" flexDirection="column" gap="spacing.3">
-          {shown.map((m) => (
-            <MemberCard
-              key={m.id}
-              member={m}
-              which={which}
-              onOpen={() => onOpenMember(m.id)}
-              onSendLink={() => onRenewOne(m)}
-            />
-          ))}
-        </Box>
-
-        {shown.length === 0 && (
-          <Box display="flex" flexDirection="column" alignItems="center" gap="spacing.3" paddingY="spacing.8">
-            {q ? <SearchIcon size="xlarge" color="surface.icon.gray.muted" /> : <UsersIcon size="xlarge" color="surface.icon.gray.muted" />}
-            <Text size="medium" color="surface.text.gray.muted" textAlign="center">
-              {q ? `No members match "${query.trim()}".` : LISTS[which].empty}
-            </Text>
-          </Box>
-        )}
-      </div>
-
-      {/* Bulk: send everyone in this list a payment link (not for the month's
-          renewals: those are days or weeks away, and links last 2 days) */}
-      {(which === 'expiring' || which === 'expired') && all.length > 0 && (
-        <div className="full-screen-footer rzp-blue-btn">
-          <Button size="large" isFullWidth onClick={() => onSendLinks(all)}>
-            {`Renew all (${all.length})`}
-          </Button>
-        </div>
-      )}
-      {activeFilter === 'pending' && (
-        <div className="full-screen-footer rzp-blue-btn">
-          <Button size="large" isFullWidth onClick={() => onSendLinks(filtered)}>
-            {`Send payment links to all (${pendingCount})`}
-          </Button>
-        </div>
-      )}
+      <div className="full-screen-body">{list}</div>
     </div>
   );
 }

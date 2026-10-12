@@ -30,7 +30,7 @@ function FilterChips({ label, options, value, onChange }) {
  * `view` = { plan, source, query }, kept by the parent so filters survive a
  * trip to a member's details and back.
  */
-export default function PaymentsScreen({ members, view = {}, onViewChange, onBack, onOpenMember }) {
+export default function PaymentsScreen({ members, view = {}, onViewChange, onBack, onOpenMember, voiceButton = null }) {
   const plan = view.plan ?? null; // null = all plans
   const source = view.source ?? 'all'; // 'all' | 'razorpay' | 'recorded'
   const query = view.query ?? '';
@@ -63,15 +63,17 @@ export default function PaymentsScreen({ members, view = {}, onViewChange, onBac
     .join(' · ');
 
   return (
-    <div className="full-screen">
-      <Box display="flex" alignItems="center" gap="spacing.2" paddingX="spacing.3" paddingY="spacing.3">
-        <IconButton icon={ArrowLeftIcon} size="large" accessibilityLabel="Back" onClick={onBack} />
-        <Heading size="medium" weight="semibold">
-          {month} payments
-        </Heading>
-      </Box>
+    <div className="main-screen">
+      <div className="main-header">
+        <div className="main-header-row" style={{ justifyContent: 'flex-start' }}>
+          <IconButton icon={ArrowLeftIcon} size="large" accessibilityLabel="Back" onClick={onBack} />
+          <Heading size="medium" weight="semibold">
+            {month} payments
+          </Heading>
+        </div>
+      </div>
 
-      <div className="full-screen-body">
+      <div className="main-body">
         <Box marginBottom="spacing.3">
           <SearchInput
             accessibilityLabel="Search payments by name"
@@ -145,6 +147,7 @@ export default function PaymentsScreen({ members, view = {}, onViewChange, onBac
           </Box>
         )}
       </div>
+      {voiceButton}
     </div>
   );
 }

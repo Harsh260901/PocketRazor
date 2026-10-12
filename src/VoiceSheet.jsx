@@ -40,11 +40,17 @@ export default function VoiceSheet({
   extraBody = {},
   isUseful = () => true,
   nothingFoundMessage = "Couldn't find the details in that. Try again.",
+  // Assistant extras (all optional)
+  chips = [], // tappable examples: [{ label, onPick }]
+  localFallback = null, // (words) => result, used if the AI can't be reached
+  thinkingText = 'Filling in the form…',
+  submitLabel = 'Fill in form',
+  startTyping = false,
   onClose,
   onResult,
 }) {
   // 'listening' | 'typing' | 'thinking' | 'error'
-  const [mode, setMode] = useState(SpeechRecognition ? 'listening' : 'typing');
+  const [mode, setMode] = useState(SpeechRecognition && !startTyping ? 'listening' : 'typing');
   const [finalText, setFinalText] = useState('');
   const [interimText, setInterimText] = useState('');
   const [typedText, setTypedText] = useState('');
@@ -68,10 +74,23 @@ export default function VoiceSheet({
         body: JSON.stringify({ ...extraBody, text: words }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'Something went wrong. Try again.');
+      if (!res.ok) {
+        // The AI is down or busy: answer with the simple keyword version instead
+        const backup = localFallback?.(words);
+        if (backup) {
+          onResult(backup, words);
+          return;
+        }
+        throw new Error(data.error || 'Something went wrong. Try again.');
+      }
       if (!isUseful(data)) throw new Error(nothingFoundMessage);
       onResult(data, words);
     } catch (e) {
+      const backup = e instanceof TypeError ? localFallback?.(words) : null; // no connection
+      if (backup) {
+        onResult(backup, words);
+        return;
+      }
       setError(e.message);
       setMode('error');
     }
@@ -199,7 +218,7 @@ export default function VoiceSheet({
   // The tiny delay means that when React opens the panel twice in a row
   // (it does this in development to catch bugs), only one session starts.
   useEffect(() => {
-    if (!SpeechRecognition) return undefined;
+    if (!SpeechRecognition || startTyping) return undefined;
     const timer = setTimeout(startListening, 50);
     return () => {
       clearTimeout(timer);
@@ -259,6 +278,7 @@ export default function VoiceSheet({
                 <span style={{ color: '#8a94a6' }}>For example: "{example}"</span>
               )}
             </div>
+            <Chips chips={chips} onPick={(c) => { cancelListening(); c.onPick(); }} />
             <Button variant="tertiary" size="small" onClick={switchToTyping}>
               Type instead
             </Button>
@@ -274,10 +294,11 @@ export default function VoiceSheet({
               value={typedText}
               onChange={({ value }) => setTypedText(value ?? '')}
             />
+            <Chips chips={chips} onPick={(c) => c.onPick()} />
             <Box marginTop="spacing.4" display="flex" gap="spacing.3">
               <div style={{ flex: 1 }} className="rzp-blue-btn">
                 <Button isFullWidth onClick={() => fillFields(typedText)}>
-                  Fill in form
+                  {submitLabel}
                 </Button>
               </div>
               {SpeechRecognition && (
@@ -293,9 +314,9 @@ export default function VoiceSheet({
 
         {mode === 'thinking' && (
           <Box display="flex" flexDirection="column" alignItems="center" gap="spacing.4" paddingY="spacing.8">
-            <Spinner accessibilityLabel="Filling in the form" size="large" />
+            <Spinner accessibilityLabel={thinkingText} size="large" />
             <Text size="medium" color="surface.text.gray.normal">
-              Filling in the form…
+              {thinkingText}
             </Text>
           </Box>
         )}
@@ -327,6 +348,20 @@ export default function VoiceSheet({
           </Box>
         )}
       </div>
+    </div>
+  );
+}
+
+// Tappable example questions ("Who's expiring this week?")
+function Chips({ chips, onPick }) {
+  if (!chips?.length) return null;
+  return (
+    <div className="ask-chips">
+      {chips.map((c) => (
+        <button key={c.label} type="button" onClick={() => onPick(c)}>
+          {c.label}
+        </button>
+      ))}
     </div>
   );
 }

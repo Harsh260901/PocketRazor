@@ -228,6 +228,8 @@ export function endsText(m, now = today()) {
   if (left === 0) return 'Ends today';
   if (left === 1) return 'Ends tomorrow';
   if (left <= EXPIRING_WINDOW_DAYS) return `Ends ${fmtWeekday(m.periodEnd)}`;
+  // Next year or later: add the year ("Ends 27 Jul 2027")
+  if (new Date(m.periodEnd).getFullYear() !== now.getFullYear()) return `Ends ${fmtFull(m.periodEnd)}`;
   return `Ends ${fmtDay(m.periodEnd)}`;
 }
 
@@ -293,10 +295,10 @@ export function buildSampleMembers(plans = SAMPLE_PLANS) {
   // Fixed cases first so the cards always show 5 expiring and 3 expired
   const fixed = [
     { name: 'Rahul Kumar', plan: gold, opt: 0, endIn: 1 },
-    { name: 'Priya Sharma', plan: yoga, opt: 0, endIn: 2 },
+    { name: 'Priya Sharma', plan: yoga, opt: 0, endIn: 0 }, // two end today, for "renew everyone expiring today"
     { name: 'Arjun Mehta', plan: gold, opt: 1, endIn: 4 },
     { name: 'Sneha Nair', plan: swim, opt: 0, endIn: 6 },
-    { name: 'Rohan Desai', plan: yoga, opt: 0, endIn: 7 },
+    { name: 'Rohan Desai', plan: yoga, opt: 0, endIn: 0 },
     { name: 'Vikram Rao', plan: gold, opt: 0, endIn: -3 },
     { name: 'Anita Joshi', plan: yoga, opt: 1, endIn: -11 },
     { name: 'Karan Das', plan: swim, opt: 0, endIn: -20 },

@@ -2,6 +2,7 @@ import react from '@vitejs/plugin-react';
 import { defineConfig, loadEnv } from 'vite';
 import { handleParsePlan } from './api/_parsePlan.js';
 import { handleParseMember } from './api/_parseMember.js';
+import { handleAsk } from './api/_ask.js';
 import { handleSendPaymentLinks, handleListPaymentLinks, handleResendLink } from './api/_paymentLinks.js';
 
 // Lets `npm run dev` answer the /api routes on your laptop, the same way
@@ -10,6 +11,7 @@ import { handleSendPaymentLinks, handleListPaymentLinks, handleResendLink } from
 const ROUTES = {
   '/api/parse-plan': handleParsePlan,
   '/api/parse-member': handleParseMember,
+  '/api/ask': handleAsk,
   '/api/send-payment-links': handleSendPaymentLinks,
   '/api/payment-links': handleListPaymentLinks,
   '/api/resend-link': handleResendLink,

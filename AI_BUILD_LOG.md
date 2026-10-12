@@ -26,7 +26,7 @@ flowchart LR
 | | **Notion AI** | Built in | One research workspace and a full mind map |
 | Build | **Claude Code / Claude Cowork** | Claude Opus | Mockups, all code, automated tests |
 | Deploy and docs | **Claude** | Claude Opus | GitHub and Vercel setup, product note, this log |
-| In the product | **Gemini API** | gemini-flash-latest (falls back to flash-lite) | Turning a spoken sentence into form fields |
+| In the product | **Gemini API** | gemini-flash-latest (falls back to flash-lite) | Voice assistant: works out what the owner asked, and turns "add a member" / "create a plan" into form fields |
 | | **Browser speech recognition** | Web Speech API, Indian English | Voice to text before Gemini |
 
 ---
@@ -241,6 +241,8 @@ flowchart LR
 
 **Guardrails:** a fixed output format · only the merchant's existing plans can be picked · understands Indian speech ("double nine" = 99) · never invents details · retries and a lighter fallback model · "Type instead" always available.
 
+**Questions work the same way:** for "Who hasn't paid?" or "Has Rahul paid?", or a free-form one like "Which plan earns the most this month?", Gemini only works out *what* was asked and describes the lookup (which records, filters, totals). It never sees the members or the money; the app answers from its own records. Anything that moves money ("Renew Rahul") only offers **Review & renew**, which opens the usual confirm screen: voice never renews, sends or saves on its own.
+
 <details>
 <summary>The instruction Gemini runs on (excerpt)</summary>
 
@@ -321,6 +323,11 @@ flowchart LR
 - **Honest about scope:** other product cards say *"Not in scope for this prototype"*.
 - **Plans change only at renewal,** so there are no refunds or part-payments mid-cycle.
 
+### 5.4 Voice can find, but never act
+
+- **The AI suggested voice commands like "Renew Priya by cash".** I ruled that out: voice never renews, sends or saves. "Renew everyone expiring today" lists the members with a tick box each; I untick anyone I don't want, and **Review & send links** opens the usual confirm screen.
+- **My own testing caught two AI mistakes.** "How much did I make on 11th October?" returned the whole month's total, because the assistant had no notion of a specific date. And Gemini was silently rejecting every request (blank options in the answer format it was given), so all questions were falling back to a simple keyword match. I found both by testing with my own Gemini key on my laptop and reading the server logs; both were fixed and re-tested.
+
 ---
 
 ## 6. What AI did vs what I decided
@@ -360,12 +367,13 @@ flowchart LR
 | Cash is self-reported (shown separately from verified payments) | Same, kept separate |
 | Voice needs Chrome or Safari ("Type instead" works everywhere) | Native speech in the app |
 | Gemini free tier can be busy (retries and fallback cover it) | Paid tier |
+| Free-form questions need Gemini; without it, only common questions work (keyword match) | Paid tier and a faster, local-first router |
 | Four interviews shaped the problem | Wider merchant validation |
 
 | Risk | Guardrail |
 |---|---|
 | AI research gets a fact wrong | Three models cross-checked, plus interviews; every figure sourced |
-| Gemini mishears or invents | Fixed fields, existing plans only, owner confirms before saving |
+| Gemini mishears or invents | Fixed fields, existing plans only, owner confirms before saving; answers are computed from the app's records, never written by AI |
 | Keys leak | Server only, every commit checked, free tier and test mode (5.1) |
 | A payment renews a member twice | Each paid link applied once; cash marks open links as handled |
 | AI-written code hides bugs | Automated tests plus my own testing on a phone |
@@ -374,7 +382,7 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-  A["16 automated test suites<br/>2 phone widths, every change"] --> B["Server logic checked<br/>2-day links, 7-day tracker"]
+  A["20+ automated test suites<br/>3 phone widths, every change"] --> B["Server logic checked<br/>2-day links, 7-day tracker"]
   B --> C["Real test payment<br/>member renewed automatically"]
   C --> D["Live check on my phone<br/>after every deploy"]
 ```
