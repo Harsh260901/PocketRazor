@@ -272,6 +272,13 @@ const NAMES = [
   'Omkar Patil', 'Sana Mirza', 'Vivek Anand',
 ];
 
+// A fresh tag on every page load, added to each sample member's id. Payment
+// links are matched to members by id, so links sent (or paid) on an earlier
+// visit never attach to today's sample members: every refresh starts with
+// the full demo again (Priya and Rohan ending today, nobody renewed yet),
+// for each person who opens the app.
+const VISIT = Math.random().toString(36).slice(2, 7);
+
 // Small seeded random generator, so the sample data is the same on every load
 function seeded(seed) {
   let s = seed;
@@ -331,7 +338,7 @@ export function buildSampleMembers(plans = SAMPLE_PLANS) {
     const digits = `${pick(['9', '8', '7'])}${String(Math.floor(rand() * 1e9)).padStart(9, '0')}`;
     const email = rand() < 0.6 ? `${f.name.split(' ')[0].toLowerCase()}${10 + (i % 80)}@gmail.com` : '';
     return {
-      id: `s${i}`,
+      id: `s${i}-${VISIT}`,
       name: f.name,
       phone: DEMO_PHONE, // (digits above still drawn so the rest of the sample data stays the same)
       email,
@@ -354,7 +361,7 @@ export function buildSampleMembers(plans = SAMPLE_PLANS) {
     const price = p.plan.prices[0];
     const start = addDays(now, p.startIn);
     return {
-      id: p.id,
+      id: `${p.id}-${VISIT}`,
       name: p.name,
       phone: p.phone,
       email: '',
