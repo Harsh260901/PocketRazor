@@ -294,7 +294,7 @@ flowchart LR
 
 - **The easy path** puts keys in the app's code, and a folder with a key file is one careless commit from public GitHub.
 - **My rule, before any code was written:** keys stay on the server, out of the repository and out of the chat. I checked every commit by hand, replaced the `.gitignore`, and had the built app scanned for keys.
-- **Damage limited anyway:** free tier with billing off, and Razorpay in test mode, so a leaked key can't cost money.
+- **Damage limited anyway:** Gemini on small prepaid credits with auto-reload off (spend can never exceed the balance), and Razorpay in test mode, so a leaked key can't cost much.
 
 ### 5.2 Simple over overwhelming
 
@@ -366,7 +366,7 @@ flowchart LR
 | Sample members share one demo number | Real merchant data |
 | Cash is self-reported (shown separately from verified payments) | Same, kept separate |
 | Voice needs Chrome or Safari ("Type instead" works everywhere) | Native speech in the app |
-| Gemini free tier can be busy (retries and fallback cover it) | Paid tier |
+| Gemini can still be busy at peak times (model switch and fallback cover it) | Higher paid tier or a second AI provider |
 | Free-form questions need Gemini; without it, only common questions work (keyword match) | Paid tier and a faster, local-first router |
 | Four interviews shaped the problem | Wider merchant validation |
 
@@ -374,7 +374,7 @@ flowchart LR
 |---|---|
 | AI research gets a fact wrong | Three models cross-checked, plus interviews; every figure sourced |
 | Gemini mishears or invents | Fixed fields, existing plans only, owner confirms before saving; answers are computed from the app's records, never written by AI |
-| Keys leak | Server only, every commit checked, free tier and test mode (5.1) |
+| Keys leak | Server only, every commit checked, prepaid Gemini credits with auto-reload off, Razorpay test mode (5.1) |
 | A payment renews a member twice | Each paid link applied once; cash marks open links as handled |
 | AI-written code hides bugs | Automated tests plus my own testing on a phone |
 
